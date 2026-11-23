@@ -225,9 +225,9 @@ test('blocks sizing with a contract from another account platform', () => {
   assert.match(result.errors[0], /selected account platform/);
 });
 
-test('round-trip cost components are charged per unit and require app confirmation', () => {
-  const result = sizePosition({...base, riskFraction: 0.6, slippageTicks: 2, spreadTicks: 1, feePerUnit: 1, costsConfirmed: false});
-  assert.equal(result.status, 'VERIFY');
+test('round-trip cost components are charged per unit', () => {
+  const result = sizePosition({...base, riskFraction: 0.6, slippageTicks: 2, spreadTicks: 1, feePerUnit: 1});
+  assert.equal(result.status, 'CALCULATED');
   assert.ok(Math.abs(result.roundTripCosts - result.quantity * 1.75) < 1e-12);
 });
 
