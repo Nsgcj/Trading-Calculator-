@@ -54,7 +54,8 @@
 
         <div class="panel center-panel">
           <div class="panel-title"><div><div class="section-kicker">02 / THE SETUP</div><h2>Trade parameters</h2></div><span class="panel-mark">⌗</span></div>
-          <label for="instrumentSelect">Instrument & platform contract</label><select id="instrumentSelect"></select>
+          <label for="instrumentSelect">Instrument & platform contract</label><select id="instrumentSelect" aria-describedby="instrumentAccount"></select>
+          <p id="instrumentAccount" class="micro-note" role="status"></p>
           <div class="inline-action"><button type="button" id="addInstrumentBtn" class="link-button">+ Duplicate & customize instrument</button></div>
           <div id="newInstrumentPanel" class="new-panel" hidden><div class="field-row"><div class="field"><label for="newInstrumentSymbol">Symbol</label><input id="newInstrumentSymbol" placeholder="e.g. XAUUSD" maxlength="24" /></div><div class="field"><label for="newInstrumentName">Description</label><input id="newInstrumentName" placeholder="Gold CFD" maxlength="80" /></div></div><button type="button" id="saveInstrumentBtn" class="small-primary">Create custom instrument</button></div>
           <div class="direction-toggle" role="group" aria-label="Trade direction"><button type="button" id="longBtn" class="active" aria-pressed="true">↑ Long</button><button type="button" id="shortBtn" aria-pressed="false">↓ Short</button></div>
@@ -77,14 +78,13 @@
             <div class="field" id="rrField"><label for="rr" id="rrLabel">Target stop-distance multiple</label><input type="number" id="rr" step="any" min="0.01" value="3" inputmode="decimal"/></div>
           </div>
           <p class="micro-note" id="budgetTargetNote" hidden>The target aims for net profit equal to the selected loss budget times this multiple, accounting for estimated costs and tick size.</p>
-          <details class="advanced" open><summary>Contract specification & execution costs <span>EDITABLE</span></summary>
+          <details class="advanced"><summary>Contract specification & execution costs <span>OPTIONAL SETTINGS</span></summary>
             <div class="field-row"><div class="field"><label for="tickSize">Minimum price tick</label><input id="tickSize" type="number" step="any" min="0" /></div><div class="field"><label for="pointValue">Cash per 1.0 price move <span>quote ccy / unit</span></label><input id="pointValue" type="number" step="any" min="0" /></div></div>
             <div class="field-row"><div class="field"><label for="conversion">Quote currency → USD rate</label><input id="conversion" type="number" step="any" min="0" /></div><div class="field"><label for="pipSize">Pip size <span>FX only</span></label><input id="pipSize" type="number" step="any" min="0" placeholder="N/A" /></div></div>
             <div class="field-row"><div class="field"><label for="qtyStep">Quantity increment</label><input id="qtyStep" type="number" step="any" min="0" /></div><div class="field"><label for="minQty">Minimum order size</label><input id="minQty" type="number" step="any" min="0" /></div></div>
             <div class="field-row thirds"><div class="field"><label for="slippageTicks">Total modeled slippage <span>ticks</span></label><input id="slippageTicks" type="number" step="any" min="0" value="2" /></div><div class="field"><label for="spreadTicks">Additional spread <span>ticks</span></label><input id="spreadTicks" type="number" step="any" min="0" value="0" /></div><div class="field"><label for="feePerUnit">Round-trip fee <span>$ per native unit</span></label><input id="feePerUnit" type="number" step="any" min="0" value="0" /></div></div>
-            <div class="field-row"><div class="field"><label for="stressTicks">Extra stress slippage <span>ticks</span></label><input id="stressTicks" type="number" step="any" min="0" value="2" /></div><div class="field spec-check"><div class="check-row"><input type="checkbox" id="specVerified"/><label for="specVerified">I verified these contract units with the venue.</label></div></div></div>
+            <div class="field-row"><div class="field"><label for="stressTicks">Extra stress slippage <span>ticks</span></label><input id="stressTicks" type="number" step="any" min="0" value="2" /></div><div class="field spec-check" id="manualSpecConfirmation"><div class="check-row"><input type="checkbox" id="specVerified"/><label for="specVerified">I verified these contract units with the venue.</label></div></div></div>
             <p class="micro-note">Enter estimated entry and exit slippage together. Add spread only if it is separate from that estimate. Enter both sides of commissions and fees in USD per contract, lot, share, or coin. Defaults are examples.</p>
-            <div class="check-row"><input type="checkbox" id="costsConfirmed"/><label for="costsConfirmed">I checked these cost estimates for this account and instrument.</label></div>
             <div class="field-row">
               <div class="field"><label for="minNotional">Minimum order value <span>quote currency</span></label><input id="minNotional" type="number" step="any" min="0" placeholder="Not set" /></div>
               <div class="field"><button type="button" id="lookupSpec" class="small-primary" hidden>Load exchange specification</button></div>

@@ -42,6 +42,10 @@ function fillAccounts(){
  if(!state.accounts.some(a=>a.id===state.accountId))state.accountId=state.accounts[0].id;
  $('accountSelect').value=state.accountId;
 }
+const platformNames={
+ vest:'Vest',futures:'Futures',custom:'Personal / FX',hyperliquid:'Hyperliquid',
+ 'binance-linear':'Binance USDⓈ-M','bybit-linear':'Bybit USDT',
+};
 function fillInstruments(restoreAccountChoice=false){
  const account=selectedAccount();
  const available=getApplicable();
@@ -52,8 +56,10 @@ function fillInstruments(restoreAccountChoice=false){
  state.instrumentId=chosen?.id??'';
  account.instrumentId=state.instrumentId;
  const groups=new Map();
- for(const instrument of available){
-  const label=instrument.asset||'Other';
+ const otherInstruments=state.instruments.filter(instrument=>instrument.platform!==account.platform);
+ for(const instrument of [...available,...otherInstruments]){
+  const platform=platformNames[instrument.platform]??instrument.platform;
+  const label=`${platform} · ${instrument.asset||'Other'}`;
   if(!groups.has(label)){
    const group=document.createElement('optgroup');
    group.label=label;
@@ -63,9 +69,9 @@ function fillInstruments(restoreAccountChoice=false){
  }
  $('instrumentSelect').replaceChildren(...groups.values());
  $('instrumentSelect').value=state.instrumentId;
+ $('instrumentAccount').textContent=`Sizing account: ${account.name}. Choosing a contract on another platform switches accounts.`;
 }
 function syncAccountFields(){
- $('costsConfirmed').checked=false;
  const a=selectedAccount();
  for(const k of ['equity','floor','reserve','dailyRemaining','maxQuantity'])$(k).value=a[k]??'';
  $('accountVerified').checked=Boolean(a.verified);
@@ -76,7 +82,6 @@ function syncAccountFields(){
  $('accountNote').textContent = notes[a.platform] ?? 'Enter your current equity, loss floor and any venue or account limits. Keep these values up to date.';
 }
 function syncSpecFields(){
- $('costsConfirmed').checked=false;
  const s=selectedInstrument();
  quoteRequest?.abort();
  updateQuoteControl();
@@ -107,6 +112,7 @@ function renderSpec(s){
  const isCurrent=!s.lookupAt || Date.now()-s.lookupAt<86400000;
  $('specVerified').checked=Boolean(s.verified && isCurrent && s.platform!=='hyperliquid');
  $('specVerified').disabled=s.platform==='hyperliquid' || Boolean(s.lookupAt);
+ $('manualSpecConfirmation').hidden=$('specVerified').disabled || Boolean(s.sourceUrl && s.verified);
  $('specSource').textContent=`${s.source||'Custom broker specification'} · Native order size: ${s.unit} · ${s.symbol}. Price input is independent.`;
  const reference=$('contractReference');
  const url=s.sourceUrl??specificationSources[s.platform];
@@ -126,9 +132,8 @@ async function lookupSpec(){
   const rules=await fetchContractSpec(instrument,{signal:request.signal});
   if(request.signal.aborted) return;
   Object.assign(instrument,rules,{lookupAt:Date.now(),verified:true,pointValueQuote:1});
-  $('costsConfirmed').checked=false;
   renderSpec(instrument);
-  status.textContent='Published rules loaded. Enter the quote-to-USD rate and your execution costs.';
+  status.textContent='Published rules loaded. Quote conversion and costs are separate estimates.';
   save();refresh();
  } catch {
   if(!request.signal.aborted) status.textContent='Exchange rules unavailable. Existing values are unchanged.';
@@ -194,7 +199,7 @@ function setMode(mode){
  save();refresh();
 }
 function params(fraction=state.modeFractions[state.mode]){
- return {account:selectedAccount(),instrument:selectedInstrument(),side:state.side,entry:inputNumber('entry'),stopMode:$('useStop').checked?$('stopMode').value:'none',assumedMovePercent:inputNumber('assumedMove'),stopInput:inputNumber('stopInput'),plannedQuantity:inputNumber('plannedQuantity'),targetMode:$('useTarget').checked?$('targetMode').value:'none',rr:inputNumber('rr'),slippageTicks:inputNumber('slippageTicks'),spreadTicks:inputNumber('spreadTicks'),feePerUnit:inputNumber('feePerUnit'),stressExtraTicks:inputNumber('stressTicks'),riskFraction:fraction,costsConfirmed:$('costsConfirmed').checked};
+ return {account:selectedAccount(),instrument:selectedInstrument(),side:state.side,entry:inputNumber('entry'),stopMode:$('useStop').checked?$('stopMode').value:'none',assumedMovePercent:inputNumber('assumedMove'),stopInput:inputNumber('stopInput'),plannedQuantity:inputNumber('plannedQuantity'),targetMode:$('useTarget').checked?$('targetMode').value:'none',rr:inputNumber('rr'),slippageTicks:inputNumber('slippageTicks'),spreadTicks:inputNumber('spreadTicks'),feePerUnit:inputNumber('feePerUnit'),stressExtraTicks:inputNumber('stressTicks'),riskFraction:fraction};
 }
 function renderSummary(r){
  const a=selectedAccount(),h=getHeadroom(a);
@@ -231,7 +236,7 @@ function renderTicket(r){
  $('stopWidth').textContent=good?`${fmt(r.stopDistance,6)} pts · ${fmt(r.stopTicks,2)} ticks`:'—';
  $('stressRisk').textContent=good?'−'+usd(r.stressRisk):'—';
  $('statusMessage').className='status-message '+(r?.status==='BLOCKED'?'blocked':r?.status==='CALCULATED'?'verified':'');
- $('statusMessage').textContent=r?.status==='BLOCKED'?'BLOCKED — '+(r.errors[0]||'One or more hard risk checks failed.') :r?.status==='VERIFY'?'VERIFY BEFORE USE — numbers are illustrative; check account rules, contract specifications and execution costs.':noStop?'SCENARIO — size is based on the assumed adverse move and estimated costs. Losses can exceed this estimate.':'SIZED — values include entered execution costs. This is not broker permission to execute.';
+ $('statusMessage').textContent=r?.status==='BLOCKED'?'BLOCKED — '+(r.errors[0]||'One or more hard risk checks failed.') :r?.status==='VERIFY'?'VERIFY BEFORE USE — numbers are illustrative; check the account rules and any unverified contract assumptions.':noStop?'SCENARIO — size is based on the assumed adverse move and estimated costs. Losses can exceed this estimate.':'SIZED — values include entered execution costs. This is not broker permission to execute.';
  $('warningList').replaceChildren(...(r?.warnings||[]).map(message=>{const el=document.createElement('div');el.className='warning-item';el.textContent=message;return el;}));
  if(r?.errors?.length>1)for(const message of r.errors.slice(1)){const el=document.createElement('div');el.className='warning-item';el.textContent=message;$('warningList').append(el);}
  $('copyBtn').disabled=r?.status!=='CALCULATED';
@@ -272,14 +277,15 @@ function updateSpec(event){
  $('lookupSpec').disabled=false;
  $('lookupStatus').hidden=true;
  s[fields[field]]=optionalNumber(field);
- $('costsConfirmed').checked=false;
  if(field!=='conversion' || !s.lookupAt){
   s.verified=false;
   delete s.lookupAt;
+  delete s.sourceUrl;
   s.source='User-edited contract specification';
  }
  $('specVerified').checked=Boolean(s.verified && (!s.lookupAt || Date.now()-s.lookupAt<86400000));
  $('specVerified').disabled=s.platform==='hyperliquid' || Boolean(s.lookupAt);
+ $('manualSpecConfirmation').hidden=$('specVerified').disabled || Boolean(s.sourceUrl && s.verified);
  $('specSource').textContent=`${s.source} · ${s.symbol}`;
  save();refresh();
 }
@@ -303,7 +309,25 @@ function init(){
   if(previousInstrument!==state.instrumentId) syncSpecFields();
   save();refresh();
  });
- $('instrumentSelect').addEventListener('change',()=>{state.instrumentId=$('instrumentSelect').value;selectedAccount().instrumentId=state.instrumentId;syncSpecFields();save();refresh();});
+ $('instrumentSelect').addEventListener('change',()=>{
+  const instrument=state.instruments.find(item=>item.id===$('instrumentSelect').value);
+  if(!instrument) return;
+  if(instrument.platform!==selectedAccount().platform){
+   const accounts=state.accounts.filter(account=>account.platform===instrument.platform);
+   const account=accounts.find(item=>item.instrumentId===instrument.id)??accounts[0];
+   if(!account){
+    fillInstruments();
+    $('instrumentAccount').textContent='Create an account profile for this platform to size this instrument.';
+    return;
+   }
+   state.accountId=account.id;
+   fillAccounts();
+   syncAccountFields();
+  }
+  state.instrumentId=instrument.id;
+  fillInstruments();
+  syncSpecFields();save();refresh();
+ });
  for(const mode of Object.keys(MODES))$('mode-'+mode).addEventListener('click',()=>setMode(mode));
  for(const k of ['equity','floor','reserve','dailyRemaining','maxQuantity'])$(k).addEventListener('input',updateAccount);
  $('accountVerified').addEventListener('change',updateAccount);
@@ -325,11 +349,7 @@ function init(){
  $('stopMode').addEventListener('change',switchStopMode);
  $('targetMode').addEventListener('change',updateTargetMode);
  for(const id of ['assumedMove','stopInput','plannedQuantity','rr','stressTicks'])$(id).addEventListener('input',refresh);
- for(const id of ['slippageTicks','spreadTicks','feePerUnit'])$(id).addEventListener('input',()=>{
-  $('costsConfirmed').checked=false;
-  refresh();
- });
- $('costsConfirmed').addEventListener('change',refresh);
+ for(const id of ['slippageTicks','spreadTicks','feePerUnit'])$(id).addEventListener('input',refresh);
  for(const id of ['tickSize','pointValue','conversion','pipSize','qtyStep','minQty','minNotional'])$(id).addEventListener('input',updateSpec);
  $('lookupSpec').addEventListener('click',lookupSpec);
  $('specVerified').addEventListener('change',()=>{selectedInstrument().verified=$('specVerified').checked;save();refresh();});
@@ -347,6 +367,8 @@ function init(){
   const symbol=$('newInstrumentSymbol').value.trim().toUpperCase().replace(/[^A-Z0-9._-]/g,'').slice(0,24),name=$('newInstrumentName').value.trim();
   if(!symbol||!name){(!symbol?$('newInstrumentSymbol'):$('newInstrumentName')).focus();return;}
   const id='instrument-'+Date.now(),s={...clone(selectedInstrument()),id,symbol,name,platform:selectedAccount().platform,verified:false,source:'Custom instrument — verify contract size, min step and currency conversion'};
+  delete s.lookupAt;
+  delete s.sourceUrl;
   state.instruments.push(s);state.instrumentId=id;fillInstruments();syncSpecFields();$('newInstrumentPanel').hidden=true;save();refresh();
  });
  $('copyBtn').addEventListener('click',async()=>{

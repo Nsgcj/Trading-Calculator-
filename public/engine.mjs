@@ -294,11 +294,11 @@ export function sizePosition(p) {
   const specCurrent=s.verified && (!s.lookupAt || Date.now()-s.lookupAt<86400000) && s.platform!=='hyperliquid';
   if (s.platform==='hyperliquid') warnings.push('Hyperliquid price precision changes with price and asset. The entered fixed tick is an estimate.');
   if (!specCurrent) warnings.push('Instrument unit/lot/contract specification NOT verified. Confirm the platform specification.');
-  if (p.costsConfirmed===false) warnings.push('Confirm execution cost estimates for this account and instrument.');
+  if (fees===0) warnings.push('Modeled commission is $0. Estimated costs can differ from actual execution.');
   if (stressRisk > h.usable + nearly) warnings.push('Stress slippage could penetrate the safety reserve / failure floor.');
   if (riskFraction>=0.25) warnings.push('High-risk mode: one adverse move could consume a large share of available drawdown.');
   if (a.dailyRemaining===null) warnings.push('No daily remaining-loss limit entered; account-specific daily rules are not checked.');
-  const verified=Boolean(a.verified && specCurrent && p.costsConfirmed!==false);
+  const verified=Boolean(a.verified && specCurrent);
   return {
     status:verified?'CALCULATED':'VERIFY',warnings,errors,headroom:h,budget,
     quantity:qty,risk,expectedReward:reward,rrNet:noTarget?undefined:reward/risk,

@@ -65,6 +65,10 @@ Conservative slippage stress is shown separately. Models may miss gaps, stop rej
 
 Data is **not** automatically updated. Contract specification status becomes unverified if manually edited. Account verification is a user self-attestation; not an API check. All risk modes are mathematical scenarios, not statistically validated presets.
 
+### Finding an instrument
+
+The instrument dropdown shows the full catalog, grouped by platform and asset class. The current account's instruments appear first. Choosing a contract on another platform switches to a compatible saved account and recalculates the budget from that account's inputs. Your saved custom instruments remain in the dropdown.
+
 ### Contract specifications and execution costs
 
 - **Load exchange specification** retrieves published tick size, quantity rules, and minimum order value for supported Binance USDⓈ-M and Bybit USDT perpetuals. If the endpoint is unavailable, existing values are kept. Reload published rules after 24 hours. The quote-to-USD conversion remains an input.
