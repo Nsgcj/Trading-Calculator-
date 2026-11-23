@@ -114,7 +114,8 @@ function syncAccountCommission(){
 }
 function syncAccountFields(){
  const a=selectedAccount();
- for(const k of ['equity','floor','reserve','dailyRemaining','maxQuantity'])$(k).value=a[k]??'';
+ for(const k of ['equity','floor','reserve','maxQuantity'])$(k).value=a[k]??'';
+ renderDailyRemaining();
  $('accountVerified').checked=Boolean(a.verified);
  $('noDailyLimit').checked=Boolean(a.noDailyLimit);
  $('dailyRemaining').disabled=Boolean(a.noDailyLimit);
@@ -318,11 +319,30 @@ function renderUnits(r){
  }
  $('unitBridge').replaceChildren(...items.map(([k,v])=>{const el=document.createElement('div');el.className='unit-item';const label=document.createElement('span');label.textContent=k;const strong=document.createElement('b');strong.textContent=v;el.append(label,strong);return el;}));
 }
+function renderDailyRemaining(){
+ const account=selectedAccount(),field=$('dailyRemaining');
+ const auto=account.noDailyLimit || account.dailyRemaining==null || account.dailyRemaining==='';
+ const available=getHeadroom(account)?.usable;
+ field.value=auto?(Number.isFinite(available)?available.toFixed(2):''):account.dailyRemaining;
+ $('dailyRemainingBasis').textContent=auto
+  ? (account.noDailyLimit ? 'Auto from equity minus floor and reserve.' : 'Auto from equity minus floor and reserve. Enter a separate daily allowance if one applies.')
+  : 'Using the entered daily allowance alongside the account drawdown limit. Clear to return to auto.';
+}
 function refresh(){
+ if(document.activeElement!==$('dailyRemaining')) renderDailyRemaining();
  const r=sizePosition(params());currentResult=r;
  renderSummary(r);renderTicket(r);renderModes();renderUnits(r);
 }
-function updateAccount(){const a=selectedAccount();for(const k of ['equity','floor','reserve'])a[k]=inputNumber(k);for(const k of ['dailyRemaining','maxQuantity'])a[k]=optionalNumber(k);a.verified=$('accountVerified').checked;a.noDailyLimit=$('noDailyLimit').checked;$('dailyRemaining').disabled=a.noDailyLimit;save();refresh();}
+function updateAccount(event){
+ const account=selectedAccount();
+ for(const key of ['equity','floor','reserve']) account[key]=inputNumber(key);
+ account.maxQuantity=optionalNumber('maxQuantity');
+ if(event.target.id==='dailyRemaining') account.dailyRemaining=optionalNumber('dailyRemaining');
+ account.verified=$('accountVerified').checked;
+ account.noDailyLimit=$('noDailyLimit').checked;
+ $('dailyRemaining').disabled=account.noDailyLimit;
+ save();refresh();
+}
 function updateCommission(){
  const account=selectedAccount(),instrument=selectedInstrument();
  account.commissions??={};
@@ -402,6 +422,10 @@ function init(){
  for(const k of ['equity','floor','reserve','dailyRemaining','maxQuantity'])$(k).addEventListener('input',updateAccount);
  $('accountVerified').addEventListener('change',updateAccount);
  $('noDailyLimit').addEventListener('change',updateAccount);
+ $('dailyRemaining').addEventListener('focus',()=>{
+  if(selectedAccount().dailyRemaining==null) $('dailyRemaining').select();
+ });
+ $('dailyRemaining').addEventListener('blur',renderDailyRemaining);
  $('riskPercent').addEventListener('input',()=>{const v=inputNumber('riskPercent');state.modeFractions[state.mode]=v/100;for(const key of Object.keys(MODES))$(key+'Percent').textContent=pct(state.modeFractions[key]);save();refresh();});
  for(const side of ['long','short'])$(side+'Btn').addEventListener('click',()=>{state.side=side;for(const k of ['long','short']){$(k+'Btn').classList.toggle('active',side===k);$(k+'Btn').setAttribute('aria-pressed',String(side===k));}save();refresh();});
  $('useStop').addEventListener('change',()=>{
