@@ -34,6 +34,12 @@ const perpAssets = [
   { coin: 'BTC', name: 'Bitcoin' },
   { coin: 'ETH', name: 'Ether' },
   { coin: 'SOL', name: 'Solana' },
+  { coin: 'XRP', name: 'XRP' },
+  { coin: 'DOGE', name: 'Dogecoin' },
+  { coin: 'ADA', name: 'Cardano' },
+  { coin: 'LINK', name: 'Chainlink' },
+  { coin: 'AVAX', name: 'Avalanche' },
+  { coin: 'SUI', name: 'Sui' },
 ];
 
 function linearPerpetuals({ id, name, quote, suffix }) {
@@ -46,12 +52,27 @@ function linearPerpetuals({ id, name, quote, suffix }) {
   }));
 }
 
+const equitySource='https://www.cmegroup.com/markets/equities/sp-500-and-nasdaq-100-futures.html';
+const goldSource='https://www.cmegroup.com/education/courses/event-contracts-underlying-markets/product-gold';
+const oilSource='https://www.cmegroup.com/education/articles-and-reports/micro-wti-crude-oil-futures-faq';
+const gasSource='https://www.cmegroup.com/articles/faqs/micro-henry-hub-natural-gas-futures-and-options-frequently-asked-questions.html';
+const futuresSources={
+  MNQ:equitySource,NQ:equitySource,MES:equitySource,ES:equitySource,M2K:equitySource,RTY:equitySource,MYM:equitySource,YM:equitySource,
+  MGC:goldSource,GC:goldSource,MCL:oilSource,CL:oilSource,MNG:gasSource,NG:gasSource,
+  SI:'https://www.cmegroup.com/trading/metals/files/fact-card-silver-futures-options.pdf',
+  SIL:'https://www.cmegroup.com/content/dam/cmegroup/rulebook/COMEX/1a/121.pdf',
+  '6E':'https://www.cmegroup.com/markets/fx/g10/euro-fx/specs',
+  M6E:'https://www.cmegroup.com/markets/fx/g10/e-micro-euro/specs',
+  MBT:'https://www.cmegroup.com/markets/cryptocurrencies/bitcoin/micro-bitcoin/specs',
+  MET:'https://www.cmegroup.com/markets/cryptocurrencies/ether/micro-ether/specs',
+};
+
 function futuresTemplate(symbol, name, reference, tickSize, pointValueQuote) {
   return {
     id: `f-${symbol.toLowerCase()}`, platform: 'futures', symbol, name, asset: 'Futures',
     tickSize, pointValueQuote, quoteToUSD: 1, quantityStep: 1, minQuantity: 1,
-    unit: 'contracts', pipSize: null, verified: false, reference,
-    source: 'Confirm tick and point value against the exchange and confirm prop firm order limits',
+    unit: 'contracts', pipSize: null, verified: true, reference,
+    source: 'CME Group published outright specifications. Prop firm rules and fees are separate.', sourceUrl:futuresSources[symbol],
   };
 }
 
@@ -65,9 +86,9 @@ function fxTemplate(symbol, quote, tickSize, pipSize) {
   };
 }
 
-function shareTemplate(symbol, name) {
+function shareTemplate(symbol, name, asset) {
   return {
-    id: `c-${symbol.toLowerCase()}`, platform: 'custom', symbol, name, asset: 'ETF',
+    id: `c-${symbol.toLowerCase()}`, platform: 'custom', symbol, name, asset,
     tickSize: 0.01, pointValueQuote: 1, quoteToUSD: 1, quantityStep: 1, minQuantity: 1,
     unit: 'shares', pipSize: null, verified: false, reference: 'STOCK',
     source: 'Illustrative USD whole-share sizing; verify broker price and share increments',
@@ -79,13 +100,13 @@ function shareTemplate(symbol, name) {
 export const DEFAULT_INSTRUMENTS = [
   { id:'vest-nq', platform:'vest', symbol:'NQ-PERP', name:'Vest Nasdaq perpetual (illustrative)', asset:'Index perpetual', tickSize:0.25, pointValueQuote:1, quoteToUSD:1, quantityStep:0.01, minQuantity:0.01, unit:'units', pipSize:null, verified:false, source:'Broker contract specification must be checked', reference:'NQ' },
   { id:'vest-es', platform:'vest', symbol:'ES-PERP', name:'Vest S&P perpetual (illustrative)', asset:'Index perpetual', tickSize:0.25, pointValueQuote:1, quoteToUSD:1, quantityStep:0.01, minQuantity:0.01, unit:'units', pipSize:null, verified:false, source:'Broker contract specification must be checked', reference:'ES' },
-  { id:'f-mnq', platform:'futures', symbol:'MNQ', name:'Micro E-mini Nasdaq-100', asset:'Futures', tickSize:0.25, pointValueQuote:2, quoteToUSD:1, quantityStep:1, minQuantity:1, unit:'contracts', pipSize:null, verified:true, source:'CME contract specification', reference:'NQ' },
-  { id:'f-nq', platform:'futures', symbol:'NQ', name:'E-mini Nasdaq-100', asset:'Futures', tickSize:0.25, pointValueQuote:20, quoteToUSD:1, quantityStep:1, minQuantity:1, unit:'contracts', pipSize:null, verified:true, source:'CME contract specification', reference:'NQ' },
-  { id:'f-mes', platform:'futures', symbol:'MES', name:'Micro E-mini S&P 500', asset:'Futures', tickSize:0.25, pointValueQuote:5, quoteToUSD:1, quantityStep:1, minQuantity:1, unit:'contracts', pipSize:null, verified:true, source:'CME contract specification', reference:'ES' },
-  { id:'f-es', platform:'futures', symbol:'ES', name:'E-mini S&P 500', asset:'Futures', tickSize:0.25, pointValueQuote:50, quoteToUSD:1, quantityStep:1, minQuantity:1, unit:'contracts', pipSize:null, verified:true, source:'CME contract specification', reference:'ES' },
-  { id:'f-mgc', platform:'futures', symbol:'MGC', name:'Micro Gold Futures', asset:'Futures', tickSize:0.1, pointValueQuote:10, quoteToUSD:1, quantityStep:1, minQuantity:1, unit:'contracts', pipSize:null, verified:true, source:'CME/COMEX contract specification', reference:'GC' },
-  { id:'f-gc', platform:'futures', symbol:'GC', name:'Gold Futures', asset:'Futures', tickSize:0.1, pointValueQuote:100, quoteToUSD:1, quantityStep:1, minQuantity:1, unit:'contracts', pipSize:null, verified:true, source:'CME/COMEX contract specification', reference:'GC' },
-  { id:'f-mcl', platform:'futures', symbol:'MCL', name:'Micro WTI Crude Oil', asset:'Futures', tickSize:0.01, pointValueQuote:100, quoteToUSD:1, quantityStep:1, minQuantity:1, unit:'contracts', pipSize:null, verified:true, source:'CME/NYMEX contract specification', reference:'CL' },
+  futuresTemplate('MNQ', 'Micro E-mini Nasdaq-100', 'NQ', 0.25, 2),
+  futuresTemplate('NQ', 'E-mini Nasdaq-100', 'NQ', 0.25, 20),
+  futuresTemplate('MES', 'Micro E-mini S&P 500', 'ES', 0.25, 5),
+  futuresTemplate('ES', 'E-mini S&P 500', 'ES', 0.25, 50),
+  futuresTemplate('MGC', 'Micro Gold Futures', 'GC', 0.1, 10),
+  futuresTemplate('GC', 'Gold Futures', 'GC', 0.1, 100),
+  futuresTemplate('MCL', 'Micro WTI Crude Oil', 'CL', 0.01, 100),
   { id:'fx-eur', platform:'custom', symbol:'EURUSD', name:'EUR/USD spot FX — standard lots', asset:'Spot FX', tickSize:0.00001, pointValueQuote:100000, quoteToUSD:1, quantityStep:0.01, minQuantity:0.01, unit:'lots', pipSize:0.0001, verified:false, source:'Illustrative 100,000 EUR/lot — verify broker', reference:'EURUSD' },
   { id:'fx-jpy', platform:'custom', symbol:'USDJPY', name:'USD/JPY spot FX — standard lots', asset:'Spot FX', tickSize:0.001, pointValueQuote:100000, quoteToUSD:0, quantityStep:0.01, minQuantity:0.01, unit:'lots', pipSize:0.01, verified:false, source:'Quote JPY→USD conversion required; verify broker', reference:'USDJPY' },
   { id:'c-btc', platform:'custom', symbol:'BTCUSD', name:'Bitcoin spot — quantity in BTC', asset:'Crypto spot', tickSize:0.01, pointValueQuote:1, quoteToUSD:1, quantityStep:0.0001, minQuantity:0.0001, unit:'BTC', pipSize:null, verified:false, source:'Illustrative spot BTC; perpetual contract multipliers vary', reference:'BTC' },
@@ -97,13 +118,38 @@ export const DEFAULT_INSTRUMENTS = [
   futuresTemplate('YM', 'E-mini Dow', 'YM', 1, 5),
   futuresTemplate('CL', 'WTI Crude Oil', 'CL', 0.01, 1000),
   futuresTemplate('SI', 'Silver Futures', 'SI', 0.005, 5000),
+  futuresTemplate('SIL', 'Micro Silver Futures', 'SI', 0.005, 1000),
   futuresTemplate('NG', 'Natural Gas Futures', 'NG', 0.001, 10000),
+  futuresTemplate('MNG', 'Micro Henry Hub Natural Gas', 'NG', 0.001, 1000),
+  futuresTemplate('6E', 'Euro FX Futures', 'EURUSD', 0.00005, 125000),
+  futuresTemplate('M6E', 'Micro EUR/USD Futures', 'EURUSD', 0.0001, 12500),
+  futuresTemplate('MBT', 'Micro Bitcoin Futures', 'BTC', 5, 0.1),
+  futuresTemplate('MET', 'Micro Ether Futures', 'ETH', 0.5, 0.1),
   fxTemplate('GBPUSD', 'USD', 0.00001, 0.0001),
   fxTemplate('AUDUSD', 'USD', 0.00001, 0.0001),
   fxTemplate('USDCAD', 'CAD', 0.00001, 0.0001),
   fxTemplate('EURJPY', 'JPY', 0.001, 0.01),
-  shareTemplate('SPY', 'SPDR S&P 500 ETF'),
-  shareTemplate('QQQ', 'Invesco QQQ ETF'),
+  fxTemplate('NZDUSD', 'USD', 0.00001, 0.0001),
+  fxTemplate('USDCHF', 'CHF', 0.00001, 0.0001),
+  fxTemplate('EURGBP', 'GBP', 0.00001, 0.0001),
+  fxTemplate('GBPJPY', 'JPY', 0.001, 0.01),
+  shareTemplate('SPY', 'SPDR S&P 500 ETF', 'ETF'),
+  shareTemplate('QQQ', 'Invesco QQQ ETF', 'ETF'),
+  shareTemplate('IWM', 'iShares Russell 2000 ETF', 'ETF'),
+  shareTemplate('DIA', 'SPDR Dow Jones Industrial Average ETF', 'ETF'),
+  shareTemplate('VOO', 'Vanguard S&P 500 ETF', 'ETF'),
+  shareTemplate('VTI', 'Vanguard Total Stock Market ETF', 'ETF'),
+  shareTemplate('GLD', 'SPDR Gold Shares', 'ETF'),
+  shareTemplate('SLV', 'iShares Silver Trust', 'ETF'),
+  shareTemplate('TLT', 'iShares 20+ Year Treasury Bond ETF', 'ETF'),
+  shareTemplate('AAPL', 'Apple', 'Equity'),
+  shareTemplate('MSFT', 'Microsoft', 'Equity'),
+  shareTemplate('NVDA', 'NVIDIA', 'Equity'),
+  shareTemplate('AMZN', 'Amazon', 'Equity'),
+  shareTemplate('META', 'Meta Platforms', 'Equity'),
+  shareTemplate('GOOGL', 'Alphabet Class A', 'Equity'),
+  shareTemplate('TSLA', 'Tesla', 'Equity'),
+  shareTemplate('AMD', 'Advanced Micro Devices', 'Equity'),
   ...perpAssets.filter(({ coin }) => coin !== 'BTC').map(({ coin, name }) => ({
     id: `c-${coin.toLowerCase()}`, platform: 'custom', symbol: `${coin}USD`,
     name: `${name} spot`, asset: 'Crypto spot', tickSize: null, pointValueQuote: 1,
@@ -167,6 +213,7 @@ export function sizePosition(p) {
   const assumedMovePercent=numeric(p.assumedMovePercent);
   const tick=numeric(s.tickSize), pointQuote=numeric(s.pointValueQuote), fx=numeric(s.quoteToUSD), step=numeric(s.quantityStep), minQ=numeric(s.minQuantity);
   const slip=numeric(p.slippageTicks ?? 0), spread=numeric(p.spreadTicks ?? 0), fees=numeric(p.feePerUnit ?? 0), stressExtra=numeric(p.stressExtraTicks ?? 2);
+  if (a.platform && s.platform && a.platform!==s.platform) errors.push('Choose an instrument available for the selected account platform.');
   if (!h) errors.push('Enter valid account equity, failure floor and safety reserve.');
   else if (h.raw <= 0) errors.push('Account equity is at/below the failure floor. No trade.');
   else if (h.usable <= 0) errors.push('No usable drawdown remains after the safety reserve.');
@@ -220,32 +267,38 @@ export function sizePosition(p) {
   }
   if (!budgetStop) stop=tickRound(stopRaw,tick,p.side==='long'?'down':'up');
   const distance=Math.abs(entry-stop);
+  if (p.stopMode==='price' && !(direction*(stopRaw-entry)>0)) errors.push('Entered stop must be beyond entry in the loss direction.');
   if (stop <= 0) errors.push('Stop price must remain positive.');
   if (p.side==='long' && !(stop<entry) || p.side==='short' && !(stop>entry)) errors.push('Stop must be beyond entry in the loss direction.');
   if (!finitePositive(distance)) errors.push('Stop distance is zero.');
   if (errors.length) return {status:'BLOCKED',warnings,errors,headroom:h,budget};
+  const minNotional=numeric(s.minNotionalQuote ?? 0);
+  if (!finiteNonnegative(minNotional)) return blocked('Minimum order value must be nonnegative.');
   const lossPerUnit=distance*pointUSD+costsPerUnit;
   const qtyRisk=budgetStop?plannedQuantity:roundQuantityDown(budget/lossPerUnit,step);
   const qty=budgetStop || maxQ===null?qtyRisk:Math.min(qtyRisk,roundQuantityDown(maxQ,step));
   if (qty+nearly<minQ) errors.push(`Minimum size ${minQ} ${s.unit} would exceed the risk allowance; skip the trade or use a smaller contract.`);
   if (errors.length) return {status:'BLOCKED',warnings,errors,headroom:h,budget,minimumUnitRisk:lossPerUnit*minQ};
+  if (qty*entry*pointQuote<minNotional) return blocked('Order value at entry is below the entered venue minimum.');
   const risk=qty*lossPerUnit;
-  if (budgetStop && (!finitePositive(risk) || risk-budget>budget*1e-10)) return blocked('The generated stop exceeds the risk budget at this quantity.');
+  if (!finitePositive(risk) || risk-budget>budget*1e-10) return blocked('Modeled loss exceeds the risk budget at this quantity.');
   const targetDistance=budgetTarget?(budget*rr/qty+costsPerUnit)/pointUSD:distance*rr;
   const targetDirection=budgetTarget?-direction:direction;
   const target=noTarget?undefined:tickRound(entry-direction*targetDistance,tick,targetDirection>0?'up':'down');
-  if (!noTarget && (!finitePositive(target) || (budgetTarget && !(direction*(entry-target)>0)))) return blocked('Target price is outside the valid price range; adjust the target multiple.');
+  if (!noTarget && (!finitePositive(target) || !(direction*(entry-target)>0))) return blocked('Target price is outside the valid price range; adjust the target multiple.');
   const grossTarget=noTarget?undefined:Math.abs(target-entry)*pointUSD*qty;
   const roundTripCosts=qty*costsPerUnit;
   const reward=noTarget?undefined:grossTarget-roundTripCosts;
   const stressRisk=risk+qty*stressExtra*tick*pointUSD;
   if (!a.verified) warnings.push('Account floor and drawdown rules are not confirmed. Enter the live broker floor before trading.');
-  if (!s.verified) warnings.push('Instrument unit/lot/contract specification NOT verified. Confirm the platform specification.');
-  if (fees===0) warnings.push('Fee estimate is $0. Confirm commissions, spreads and other trading costs.');
+  const specCurrent=s.verified && (!s.lookupAt || Date.now()-s.lookupAt<86400000) && s.platform!=='hyperliquid';
+  if (s.platform==='hyperliquid') warnings.push('Hyperliquid price precision changes with price and asset. The entered fixed tick is an estimate.');
+  if (!specCurrent) warnings.push('Instrument unit/lot/contract specification NOT verified. Confirm the platform specification.');
+  if (p.costsConfirmed===false) warnings.push('Confirm execution cost estimates for this account and instrument.');
   if (stressRisk > h.usable + nearly) warnings.push('Stress slippage could penetrate the safety reserve / failure floor.');
   if (riskFraction>=0.25) warnings.push('High-risk mode: one adverse move could consume a large share of available drawdown.');
   if (a.dailyRemaining===null) warnings.push('No daily remaining-loss limit entered; account-specific daily rules are not checked.');
-  const verified=Boolean(a.verified && s.verified);
+  const verified=Boolean(a.verified && specCurrent && p.costsConfirmed!==false);
   return {
     status:verified?'CALCULATED':'VERIFY',warnings,errors,headroom:h,budget,
     quantity:qty,risk,expectedReward:reward,rrNet:noTarget?undefined:reward/risk,

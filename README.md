@@ -65,6 +65,12 @@ Conservative slippage stress is shown separately. Models may miss gaps, stop rej
 
 Data is **not** automatically updated. Contract specification status becomes unverified if manually edited. Account verification is a user self-attestation; not an API check. All risk modes are mathematical scenarios, not statistically validated presets.
 
+### Contract specifications and execution costs
+
+- **Load exchange specification** retrieves published tick size, quantity rules, and minimum order value for supported Binance USDⓈ-M and Bybit USDT perpetuals. If the endpoint is unavailable, existing values are kept. Reload published rules after 24 hours. The quote-to-USD conversion remains an input.
+- Enter total modeled slippage and any additional spread separately in ticks. Enter both sides of fees in USD per native unit. The ticket shows the estimated round-trip cost separately. Fee tiers, actual fills, funding, margin, liquidation, and prop account rules depend on the account and order.
+- Hyperliquid uses price-dependent precision. The fixed-tick calculator displays those contracts as estimates. Unverified Vest, FX, CFD and generic spot/share presets also depend on broker settings.
+
 ## Validation status
 
 - `npm test` runs deterministic regression tests (structural stops, quantity step, round-down behavior, fees/slippage sizing, long/short, quote conversions, daily limits, hard floor, and minimum tradable quantity).
