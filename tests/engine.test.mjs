@@ -59,3 +59,105 @@ test('unverified account or contract cannot be marked calculated',()=>{
  const r=sizePosition({...base,account:DEFAULT_ACCOUNTS[0],riskFraction:.6});
  assert.equal(r.status,'VERIFY');
 });
+
+const budgetStop = {
+  ...base,
+  stopMode: 'budget',
+  stopInput: undefined,
+  plannedQuantity: 0.13,
+  riskFraction: MODES.lottery.fraction,
+  slippageTicks: 2,
+  spreadTicks: 1,
+  feePerUnit: 0.10,
+  rr: 2,
+};
+
+test('budget stop keeps the entered size and accounts for costs on longs and shorts', () => {
+  for (const [side, stop] of [['long', 24954.75], ['short', 25045.25]]) {
+    const result = sizePosition({ ...budgetStop, side });
+    assert.equal(result.status, 'CALCULATED');
+    assert.equal(result.quantity, budgetStop.plannedQuantity);
+    assert.equal(result.stop, stop);
+    assert.ok(result.risk <= result.budget);
+    assert.ok(result.risk + result.quantity * instrument.tickSize > result.budget);
+  }
+});
+
+test('budget stop uses the selected drawdown mode and daily cap', () => {
+  const normal = sizePosition({ ...budgetStop, riskFraction: MODES.normal.fraction });
+  const lottery = sizePosition(budgetStop);
+  const capped = sizePosition({ ...budgetStop, account: { ...account, dailyRemaining: 0.5 } });
+  assert.equal(normal.status, 'CALCULATED');
+  assert.equal(normal.budget, 0.5);
+  assert.ok(normal.stop > lottery.stop);
+  assert.equal(capped.status, 'CALCULATED');
+  assert.equal(capped.budget, normal.budget);
+  assert.equal(capped.stop, normal.stop);
+});
+
+test('budget stop blocks missing, off-step, below-minimum and over-cap quantities', () => {
+  for (const plannedQuantity of [undefined, 0.005, 0.133, 0.14]) {
+    const result = sizePosition({
+      ...budgetStop,
+      account: { ...account, maxQuantity: 0.13 },
+      plannedQuantity,
+    });
+    assert.equal(result.status, 'BLOCKED', `quantity ${plannedQuantity}`);
+  }
+});
+
+test('budget stop blocks when the next tick and costs exceed the budget', () => {
+  const result = sizePosition({
+    ...budgetStop,
+    account: { ...account, dailyRemaining: 0.14 },
+  });
+  assert.equal(result.status, 'BLOCKED');
+});
+
+test('budget take profit covers costs and meets the net drawdown-derived goal', () => {
+  for (const [side, target] of [['long', 25093.25], ['short', 24906.75]]) {
+    const result = sizePosition({ ...budgetStop, targetMode: 'budget', side });
+    assert.equal(result.status, 'CALCULATED');
+    assert.equal(result.target, target);
+    const goal = result.budget * budgetStop.rr;
+    assert.ok(result.expectedReward >= goal);
+    assert.ok(result.expectedReward - result.quantity * instrument.tickSize < goal);
+  }
+});
+
+test('automatic take profit can use a manual stop and scales with the drawdown budget', () => {
+  const setup = { ...base, targetMode: 'budget', plannedQuantity: undefined, rr: 2 };
+  const full = sizePosition({ ...setup, riskFraction: MODES.lottery.fraction });
+  const capped = sizePosition({
+    ...setup,
+    riskFraction: MODES.lottery.fraction,
+    account: { ...account, dailyRemaining: 0.5 },
+  });
+  assert.equal(full.status, 'CALCULATED');
+  assert.equal(capped.status, 'CALCULATED');
+  assert.equal(full.stop, base.stopInput);
+  assert.equal(capped.stop, base.stopInput);
+  assert.ok(full.expectedReward >= 12);
+  assert.ok(capped.expectedReward >= 1 && capped.expectedReward < full.expectedReward);
+});
+
+test('short budget take profit blocks a target that would require a nonpositive price', () => {
+  const result = sizePosition({
+    ...budgetStop,
+    targetMode: 'budget',
+    side: 'short',
+    entry: 10,
+  });
+  assert.equal(result.status, 'BLOCKED');
+});
+
+test('missing account balances and failure floors block sizing', () => {
+  for (const field of ['equity', 'floor']) {
+    const incompleteAccount = { ...account, [field]: null };
+    assert.equal(sizePosition({ ...base, account: incompleteAccount, riskFraction: 0.6 }).status, 'BLOCKED');
+  }
+});
+
+test('rounds down quantities with scientific-notation increments', () => {
+  assert.equal(roundQuantityDown(4.29e-7, 1e-8), 4.2e-7);
+});

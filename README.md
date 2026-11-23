@@ -40,7 +40,17 @@ Conservative slippage stress is shown separately. Models may miss gaps, stop rej
 5. Verify current broker multiplier, minimum lot/quantity, tick, quote currency/USD conversion rate, fees and spread. Pre-filled **Vest values are deliberately NOT verified**, and must be confirmed before use.
 6. Review modeled native order size, dollar loss, expected reward, stress slippage and post-stop buffer. Only select trade if platform rules, margin and live risk gates also allow it. App is not an execution signal.
 
+### Stops and targets from drawdown
+
+- Under **Stop expressed as**, choose **From drawdown budget** when you know your planned quantity. Enter the quantity in the instrument's native units. The desk uses the selected mode's loss budget after any daily cap, deducts estimated costs, and rounds the stop toward entry. If that size cannot fit an adverse tick within budget, the result is **NO TRADE**.
+- Under **Take-profit method**, choose **From drawdown budget** to target the selected budget times your chosen multiple in modeled net profit. A $25 budget at 2× targets at least $50 net after estimated costs. This works with a structural stop or a budget-based stop. **From stop distance** keeps the original price-distance calculation.
+- The comparison table shows stop and target prices for each mode. A budget-based price is a modeled loss or profit level. Check market structure and the venue's liquidation rules separately.
+
 ### Instrument presets
+
+- **Account profiles:** Topstep, Apex Trader Funding, Take Profit Trader, TradeDay, Earn2Trade, and FTMO join the existing MFF and Vest examples. New profiles require your current equity, failure floor, and any applicable limits. Firm rules are entered manually.
+- **Other assets:** Russell 2000 and Dow futures and micros, WTI crude, silver, natural gas, additional FX pairs, SPY and QQQ, Ether and Solana spot, and gold CFDs.
+- **Linear crypto perps:** BTC, ETH, and SOL templates for Hyperliquid, Binance USDⓈ-M, and Bybit USDT. Enter the venue's tick, size increment, minimum order, and quote-to-USD conversion. Verify the contract units. Inverse products need a different payoff model.
 
 - **CME futures:** ES ($50/point), MES ($5/point), NQ ($20/point), MNQ ($2/point), GC ($100/$1 gold move), MGC ($10/$1 gold move), MCL ($100/$1 oil move). Standard exchange contract sizes, not prop firm position limits or fees. Consult [CME contract info](https://www.cmegroup.com/markets/equities/sp-500-and-nasdaq-100-futures.html) and product-specific specs.
 - **Vest perpetuals:** NQ-PERP and ES-PERP have **illustrative** $1 / native unit / point multipliers and an illustrative 0.01 quantity increment. These are explicitly marked **unverified**. Confirm in the live platform. Vest instant profile equity $500 and failure floor $490 are **examples**, not a promise of current terms.

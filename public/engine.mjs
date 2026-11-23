@@ -5,12 +5,74 @@ export const MODES = Object.freeze({
   lottery: { label: 'Risk the Biscuit', fraction: 0.60, explanation: '60% of usable drawdown — account loss likely' },
 });
 
+const PERPETUAL_VENUES = [
+  { id: 'hyperliquid', name: 'Hyperliquid', quote: 'USDC', suffix: '' },
+  { id: 'binance-linear', name: 'Binance USDⓈ-M', quote: 'USDT', suffix: 'USDT' },
+  { id: 'bybit-linear', name: 'Bybit USDT', quote: 'USDT', suffix: 'USDT' },
+];
+
+function accountTemplate(id, name, platform) {
+  return { id, name, platform, reserve: 0, dailyRemaining: null, maxQuantity: null, verified: false };
+}
+
 /** Default broker profiles are EXAMPLES, not validated current firm rules. */
 export const DEFAULT_ACCOUNTS = [
   { id:'vest', name:'Vest Instant — example', platform:'vest', equity:500, floor:490, reserve:0, dailyRemaining:null, maxQuantity:null, verified:false },
   { id:'mff', name:'MFF Futures — example', platform:'futures', equity:25000, floor:24000, reserve:0, dailyRemaining:null, maxQuantity:null, verified:false },
   { id:'custom', name:'Personal account — example', platform:'custom', equity:1000, floor:900, reserve:0, dailyRemaining:null, maxQuantity:null, verified:false },
+  accountTemplate('topstep', 'Topstep — setup required', 'futures'),
+  accountTemplate('apex', 'Apex Trader Funding — setup required', 'futures'),
+  accountTemplate('take-profit-trader', 'Take Profit Trader — setup required', 'futures'),
+  accountTemplate('tradeday', 'TradeDay — setup required', 'futures'),
+  accountTemplate('earn2trade', 'Earn2Trade — setup required', 'futures'),
+  accountTemplate('ftmo', 'FTMO — setup required', 'custom'),
+  ...PERPETUAL_VENUES.map(({ id, name }) => accountTemplate(id, `${name} perpetuals — setup required`, id)),
 ];
+
+const venueInput = 'Enter the venue tick, quantity step, minimum size and current quote-to-USD rate';
+const perpAssets = [
+  { coin: 'BTC', name: 'Bitcoin' },
+  { coin: 'ETH', name: 'Ether' },
+  { coin: 'SOL', name: 'Solana' },
+];
+
+function linearPerpetuals({ id, name, quote, suffix }) {
+  return perpAssets.map(({ coin, name: asset }) => ({
+    id: `${id}-${coin.toLowerCase()}`, platform: id, symbol: `${coin}${suffix}`,
+    name: `${asset} linear perpetual · ${name}`, asset: 'Crypto linear perpetual',
+    tickSize: null, pointValueQuote: 1, quoteToUSD: null, quantityStep: null, minQuantity: null,
+    unit: coin, pipSize: null, verified: false, reference: coin,
+    source: `${venueInput} (${quote}→USD). Verify cash per point and order quantity in ${coin}.`,
+  }));
+}
+
+function futuresTemplate(symbol, name, reference, tickSize, pointValueQuote) {
+  return {
+    id: `f-${symbol.toLowerCase()}`, platform: 'futures', symbol, name, asset: 'Futures',
+    tickSize, pointValueQuote, quoteToUSD: 1, quantityStep: 1, minQuantity: 1,
+    unit: 'contracts', pipSize: null, verified: false, reference,
+    source: 'Confirm tick and point value against the exchange and confirm prop firm order limits',
+  };
+}
+
+function fxTemplate(symbol, quote, tickSize, pipSize) {
+  return {
+    id: `fx-${symbol.toLowerCase()}`, platform: 'custom', symbol,
+    name: `${symbol.slice(0, 3)}/${quote} spot FX — standard lots`, asset: 'Spot FX',
+    tickSize, pointValueQuote: 100000, quoteToUSD: quote === 'USD' ? 1 : null,
+    quantityStep: 0.01, minQuantity: 0.01, unit: 'lots', pipSize, verified: false, reference: symbol,
+    source: `Illustrative standard lot; verify broker units and ${quote}→USD conversion`,
+  };
+}
+
+function shareTemplate(symbol, name) {
+  return {
+    id: `c-${symbol.toLowerCase()}`, platform: 'custom', symbol, name, asset: 'ETF',
+    tickSize: 0.01, pointValueQuote: 1, quoteToUSD: 1, quantityStep: 1, minQuantity: 1,
+    unit: 'shares', pipSize: null, verified: false, reference: 'STOCK',
+    source: 'Illustrative USD whole-share sizing; verify broker price and share increments',
+  };
+}
 
 // pointValueQuote: monetary value in the instrument's quote currency of a 1.0 price move for one native quantity.
 // quoteToUSD: units of USD per one quote-currency unit. FX crosses and non-USD quotes require a manual current rate.
@@ -29,6 +91,31 @@ export const DEFAULT_INSTRUMENTS = [
   { id:'c-btc', platform:'custom', symbol:'BTCUSD', name:'Bitcoin spot — quantity in BTC', asset:'Crypto spot', tickSize:0.01, pointValueQuote:1, quoteToUSD:1, quantityStep:0.0001, minQuantity:0.0001, unit:'BTC', pipSize:null, verified:false, source:'Illustrative spot BTC; perpetual contract multipliers vary', reference:'BTC' },
   { id:'c-stock', platform:'custom', symbol:'STOCK', name:'U.S. stock — whole shares', asset:'Equity', tickSize:0.01, pointValueQuote:1, quoteToUSD:1, quantityStep:1, minQuantity:1, unit:'shares', pipSize:null, verified:false, source:'Generic whole share stock; fractional settings vary', reference:'STOCK' },
   { id:'c-cfd', platform:'custom', symbol:'CFD-CUSTOM', name:'Custom CFD / other derivative', asset:'CFD', tickSize:0.01, pointValueQuote:0, quoteToUSD:1, quantityStep:0.01, minQuantity:0.01, unit:'lots', pipSize:null, verified:false, source:'MUST input correct broker cash value per price point per lot', reference:'OTHER' },
+  futuresTemplate('M2K', 'Micro E-mini Russell 2000', 'RTY', 0.1, 5),
+  futuresTemplate('RTY', 'E-mini Russell 2000', 'RTY', 0.1, 50),
+  futuresTemplate('MYM', 'Micro E-mini Dow', 'YM', 1, 0.5),
+  futuresTemplate('YM', 'E-mini Dow', 'YM', 1, 5),
+  futuresTemplate('CL', 'WTI Crude Oil', 'CL', 0.01, 1000),
+  futuresTemplate('SI', 'Silver Futures', 'SI', 0.005, 5000),
+  futuresTemplate('NG', 'Natural Gas Futures', 'NG', 0.001, 10000),
+  fxTemplate('GBPUSD', 'USD', 0.00001, 0.0001),
+  fxTemplate('AUDUSD', 'USD', 0.00001, 0.0001),
+  fxTemplate('USDCAD', 'CAD', 0.00001, 0.0001),
+  fxTemplate('EURJPY', 'JPY', 0.001, 0.01),
+  shareTemplate('SPY', 'SPDR S&P 500 ETF'),
+  shareTemplate('QQQ', 'Invesco QQQ ETF'),
+  ...perpAssets.filter(({ coin }) => coin !== 'BTC').map(({ coin, name }) => ({
+    id: `c-${coin.toLowerCase()}`, platform: 'custom', symbol: `${coin}USD`,
+    name: `${name} spot`, asset: 'Crypto spot', tickSize: null, pointValueQuote: 1,
+    quoteToUSD: 1, quantityStep: null, minQuantity: null, unit: coin, pipSize: null,
+    verified: false, reference: coin, source: 'Enter the venue tick, quantity step and minimum size',
+  })),
+  {
+    id: 'c-xau', platform: 'custom', symbol: 'XAUUSD', name: 'Gold CFD', asset: 'CFD',
+    tickSize: null, pointValueQuote: null, quoteToUSD: 1, quantityStep: null, minQuantity: null,
+    unit: 'lots', pipSize: null, verified: false, reference: 'GC', source: 'Enter broker cash per point, tick, size step and minimum lot',
+  },
+  ...PERPETUAL_VENUES.flatMap(linearPerpetuals),
 ];
 
 const finitePositive = v => Number.isFinite(v) && v > 0;
@@ -41,14 +128,17 @@ function tickRound(v, tick, direction) {
 }
 export function roundQuantityDown(value, step) {
   if (!finitePositive(step) || !Number.isFinite(value)) return 0;
-  const scale = 10 ** Math.min(10, Math.max(0, (String(step).split('.')[1] || '').length));
+  const [coefficient, exponent='0'] = String(step).split('e');
+  const precision = Math.max(0, (coefficient.split('.')[1]?.length ?? 0) - Number(exponent));
   const units = Math.floor((value / step) + nearly);
-  return Math.max(0, Math.round(units * step * scale) / scale);
+  return Math.max(0, Number((units * step).toFixed(Math.min(100, precision))));
 }
 export function getHeadroom(account) {
+  if ([account.equity,account.floor].some(value=>value==null || (typeof value==='string' && !value.trim()))) return null;
   const equity = numeric(account.equity), floor = numeric(account.floor), reserve = numeric(account.reserve ?? 0);
   if (!Number.isFinite(equity) || !Number.isFinite(floor) || !finiteNonnegative(reserve)) return null;
   const raw = equity - floor;
+  if (!Number.isFinite(raw)) return null;
   return {raw, usable: Math.max(0, raw - reserve)};
 }
 export function getRiskBudget(account, riskFraction) {
@@ -63,14 +153,16 @@ export function getRiskBudget(account, riskFraction) {
   return Math.max(0, budget);
 }
 /**
- * @param {object} p {account,instrument,side,entry,stopMode,stopInput,riskFraction,rr,slippageTicks,spreadTicks,feePerUnit, stressExtraTicks}
- * Calculates net stop risk INCLUDING configured costs; quantity rounded DOWN to venue step.
+ * Budget stops use a fixed plannedQuantity. Other stop modes size from stopInput.
+ * With targetMode 'budget', rr multiplies the selected dollar budget for the net profit goal.
  */
 export function sizePosition(p) {
   const warnings=[], errors=[];
   const a=p.account||{}, s=p.instrument||{};
   const h=getHeadroom(a), riskFraction=numeric(p.riskFraction), budget=getRiskBudget(a,riskFraction);
   const entry=numeric(p.entry), requested=numeric(p.stopInput), rr=numeric(p.rr);
+  const budgetStop=p.stopMode==='budget', budgetTarget=p.targetMode==='budget';
+  const plannedQuantity=numeric(p.plannedQuantity);
   const tick=numeric(s.tickSize), pointQuote=numeric(s.pointValueQuote), fx=numeric(s.quoteToUSD), step=numeric(s.quantityStep), minQ=numeric(s.minQuantity);
   const slip=numeric(p.slippageTicks ?? 0), spread=numeric(p.spreadTicks ?? 0), fees=numeric(p.feePerUnit ?? 0), stressExtra=numeric(p.stressExtraTicks ?? 2);
   if (!h) errors.push('Enter valid account equity, failure floor and safety reserve.');
@@ -78,42 +170,67 @@ export function sizePosition(p) {
   else if (h.usable <= 0) errors.push('No usable drawdown remains after the safety reserve.');
   if (budget === null) errors.push('Risk fraction or daily-loss allowance is invalid.');
   else if (budget <= 0) errors.push('Risk allowance is zero. No trade.');
-  if (!finitePositive(entry) || !finitePositive(requested)) errors.push('Entry and stop must be positive numbers.');
+  if (!finitePositive(entry)) errors.push('Entry price must be positive.');
+  if (!budgetStop && !finitePositive(requested)) errors.push('Stop must be a positive number.');
+  if (budgetStop && !finitePositive(plannedQuantity)) errors.push('Enter your planned position quantity in native units.');
   if (!finitePositive(tick) || !finitePositive(pointQuote) || !finitePositive(fx)) errors.push('Instrument tick size, point value and quote→USD rate must all be positive.');
   if (!finitePositive(step) || !finitePositive(minQ) || minQ < step - nearly) errors.push('Instrument quantity step/minimum are invalid.');
   if (!finitePositive(rr)) errors.push('Reward multiple must be positive.');
   if (![slip,spread,fees,stressExtra].every(finiteNonnegative)) errors.push('Trading costs and stress ticks cannot be negative.');
   if (!['long','short'].includes(p.side)) errors.push('Choose long or short.');
-  if (!['price','points','ticks','pips'].includes(p.stopMode)) errors.push('Invalid stop unit.');
+  if (!['price','points','ticks','pips','budget'].includes(p.stopMode)) errors.push('Invalid stop unit.');
+  if (p.targetMode!==undefined && !['stop','budget'].includes(p.targetMode)) errors.push('Invalid take-profit method.');
   if (p.stopMode==='pips' && !finitePositive(numeric(s.pipSize))) errors.push('Pips require a verified pip size in the instrument settings.');
+  const maxQ=(a.maxQuantity===null||a.maxQuantity===''||a.maxQuantity===undefined)?null:numeric(a.maxQuantity);
+  if (maxQ!==null && !finiteNonnegative(maxQ)) errors.push('Max account quantity cannot be negative.');
   if (errors.length) return {status:'BLOCKED',warnings,errors,headroom:h,budget};
-  let stopRaw;
+  const pointUSD=pointQuote*fx;
+  const costsPerUnit=(slip+spread)*tick*pointUSD+fees;
+  const blocked=message=>({status:'BLOCKED',warnings,errors:[message],headroom:h,budget});
+  if (!finitePositive(pointUSD) || !finiteNonnegative(costsPerUnit)) return blocked('Instrument value or execution costs are outside the supported range.');
   const direction = p.side==='long' ? -1 : 1;
-  if (p.stopMode==='price') stopRaw=requested;
+  let stopRaw, stop;
+  if (budgetStop) {
+    const increments=plannedQuantity/step;
+    if (!Number.isSafeInteger(Math.round(increments)) || Math.abs(increments-Math.round(increments))>nearly) {
+      return blocked('Planned quantity must match the instrument quantity increment.');
+    }
+    if (plannedQuantity<minQ || (maxQ!==null && plannedQuantity>maxQ)) {
+      return blocked('Planned quantity is outside the instrument minimum or account maximum.');
+    }
+    const distance=(budget/plannedQuantity-costsPerUnit)/pointUSD;
+    if (!finitePositive(distance)) return blocked('Estimated costs exhaust the risk budget at this quantity.');
+    stopRaw=entry+direction*distance;
+    stop=tickRound(stopRaw,tick,p.side==='long'?'up':'down');
+    if (p.side==='long') stop=Math.max(tick,stop);
+    if (!(direction*(stop-entry)>0) || !finitePositive(stop)) {
+      return blocked('The risk budget cannot fit an adverse price tick at this quantity.');
+    }
+    warnings.push('Budget stop is a modeled loss limit. Check the price against market structure and venue liquidation rules.');
+  } else if (p.stopMode==='price') stopRaw=requested;
   else {
     const distance = requested * (p.stopMode==='ticks'?tick:p.stopMode==='pips'?numeric(s.pipSize):1);
     stopRaw = entry + direction * distance;
   }
-  const stop = tickRound(stopRaw,tick,p.side==='long'?'down':'up');
+  if (!budgetStop) stop=tickRound(stopRaw,tick,p.side==='long'?'down':'up');
   const distance=Math.abs(entry-stop);
   if (stop <= 0) errors.push('Stop price must remain positive.');
   if (p.side==='long' && !(stop<entry) || p.side==='short' && !(stop>entry)) errors.push('Stop must be beyond entry in the loss direction.');
   if (!finitePositive(distance)) errors.push('Stop distance is zero.');
   if (errors.length) return {status:'BLOCKED',warnings,errors,headroom:h,budget};
-  const pointUSD=pointQuote*fx;
-  const lossPerUnit=distance*pointUSD+(slip+spread)*tick*pointUSD+fees;
-  const qtyRisk=roundQuantityDown(budget/lossPerUnit,step);
-  const maxQ=(a.maxQuantity===null||a.maxQuantity===''||a.maxQuantity===undefined)?null:numeric(a.maxQuantity);
-  if (maxQ!==null && !finiteNonnegative(maxQ)) errors.push('Max account quantity cannot be negative.');
-  const qty=maxQ===null?qtyRisk:Math.min(qtyRisk,roundQuantityDown(maxQ,step));
+  const lossPerUnit=distance*pointUSD+costsPerUnit;
+  const qtyRisk=budgetStop?plannedQuantity:roundQuantityDown(budget/lossPerUnit,step);
+  const qty=budgetStop || maxQ===null?qtyRisk:Math.min(qtyRisk,roundQuantityDown(maxQ,step));
   if (qty+nearly<minQ) errors.push(`Minimum size ${minQ} ${s.unit} would exceed the risk allowance; skip the trade or use a smaller contract.`);
   if (errors.length) return {status:'BLOCKED',warnings,errors,headroom:h,budget,minimumUnitRisk:lossPerUnit*minQ};
   const risk=qty*lossPerUnit;
-  const tpRaw=entry-direction*distance*rr;
-  const target=tickRound(tpRaw,tick,p.side==='long'?'down':'up');
-  if (target <= 0) return {status:'BLOCKED',warnings,errors:['Target price becomes nonpositive; change the reward multiple or instrument.'],headroom:h,budget};
+  if (budgetStop && (!finitePositive(risk) || risk-budget>budget*1e-10)) return blocked('The generated stop exceeds the risk budget at this quantity.');
+  const targetDistance=budgetTarget?(budget*rr/qty+costsPerUnit)/pointUSD:distance*rr;
+  const targetDirection=budgetTarget?-direction:direction;
+  const target=tickRound(entry-direction*targetDistance,tick,targetDirection>0?'up':'down');
+  if (!finitePositive(target) || (budgetTarget && !(direction*(entry-target)>0))) return blocked('Target price is outside the valid price range; adjust the target multiple.');
   const grossTarget=Math.abs(target-entry)*pointUSD*qty;
-  const roundTripCosts=qty*((slip+spread)*tick*pointUSD+fees);
+  const roundTripCosts=qty*costsPerUnit;
   const reward=grossTarget-roundTripCosts;
   const stressRisk=risk+qty*stressExtra*tick*pointUSD;
   if (!a.verified) warnings.push('Account floor and drawdown rules are not confirmed. Enter the live broker floor before trading.');
@@ -131,7 +248,7 @@ export function sizePosition(p) {
     stop,target,stopDistance:distance,stopTicks:distance/tick,
     perUnitLoss:lossPerUnit,pointValueUSD:pointUSD,tickValueUSD:pointUSD*tick,
     grossTarget,roundTripCosts,stressRisk,stressPostEquity:numeric(a.equity)-stressRisk,
-    riskFraction, originalStop:stopRaw,entry,stopMode:p.stopMode
+    riskFraction, originalStop:stopRaw,entry,stopMode:p.stopMode,targetMode:p.targetMode??'stop'
   };
 }
 
