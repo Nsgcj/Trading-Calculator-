@@ -245,7 +245,7 @@ export function getRiskBudget(account, riskFraction) {
   const h = getHeadroom(account);
   if (!h || !finitePositive(riskFraction) || riskFraction > 1) return null;
   let budget = h.usable * riskFraction;
-  if (account.dailyRemaining !== null && account.dailyRemaining !== '' && account.dailyRemaining !== undefined) {
+  if (!account.noDailyLimit && account.dailyRemaining !== null && account.dailyRemaining !== '' && account.dailyRemaining !== undefined) {
     const remaining = numeric(account.dailyRemaining);
     if (!finiteNonnegative(remaining)) return null;
     budget = Math.min(budget, remaining);
@@ -351,7 +351,7 @@ export function sizePosition(p) {
   if (fees===0) warnings.push('Modeled commission is $0. Estimated costs can differ from actual execution.');
   if (stressRisk > h.usable + nearly) warnings.push('Stress slippage could penetrate the safety reserve / failure floor.');
   if (riskFraction>=0.25) warnings.push('High-risk mode: one adverse move could consume a large share of available drawdown.');
-  if (a.dailyRemaining===null) warnings.push('No daily remaining-loss limit entered; account-specific daily rules are not checked.');
+  if (!a.noDailyLimit && a.stage!=='personal' && (a.dailyRemaining==null || a.dailyRemaining==='')) warnings.push('Daily loss allowance is unknown. Enter today’s remaining amount or select no daily cap if it applies.');
   const verified=Boolean(a.verified && specCurrent);
   return {
     status:verified?'CALCULATED':'VERIFY',warnings,errors,headroom:h,budget,
