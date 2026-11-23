@@ -1,3 +1,4 @@
+import {accountReferences} from './account-references.mjs';
 import {supportsContractLookup,fetchContractSpec} from './contract-specs.mjs';
 import {getCurrentPrice,supportsCurrentPrice} from './quotes.mjs';
 import {ACCOUNT_STAGES,MODES,DEFAULT_ACCOUNTS,DEFAULT_INSTRUMENTS,sizePosition,getHeadroom,getRiskBudget,usd,fmt} from './engine.mjs';
@@ -86,10 +87,38 @@ function fillInstruments(restoreAccountChoice=false){
  $('instrumentAccount').textContent=`Sizing account: ${account.name}. Choosing a contract on another platform switches accounts.`;
 }
 const nextStage={evaluation:'sim-funded','sim-funded':'live-funded'};
+function showReference(id, url){
+ const link=$(id);
+ link.hidden=!url;
+ if(url) link.href=url;
+}
+function renderAccountReferences(){
+ const account=selectedAccount();
+ const {fees,daily,publishedFee}=accountReferences(account,selectedInstrument());
+ $('dailyRule').textContent=daily?.[0]??(account.stage==='personal'
+  ? 'Set a personal daily cap if you use one.'
+  : 'Use the current daily allowance for your specific plan, if any.');
+ showReference('dailySource',daily?.[1]);
+ const savedFee=account.commissions?.[selectedInstrument().id];
+ const feeText=fees?.[0]??'Round-trip fees depend on the broker, instrument and account. Enter them in execution costs if applicable.';
+ $('feeSchedule').textContent=savedFee!==undefined && savedFee!==''?`${feeText} Modeled fee: ${usd(Number(savedFee))} per native unit.`:feeText;
+ showReference('feeSource',fees?.[1]);
+ const button=$('applyPublishedFee');
+ button.hidden=publishedFee===undefined;
+ if(!button.hidden) button.textContent=`Use published ${usd(publishedFee)} / round trip`;
+}
+function syncAccountCommission(){
+ const account=selectedAccount(),instrument=selectedInstrument();
+ $('feePerUnit').value=account.commissions?.[instrument.id]??'0';
+ renderAccountReferences();
+}
 function syncAccountFields(){
  const a=selectedAccount();
  for(const k of ['equity','floor','reserve','dailyRemaining','maxQuantity'])$(k).value=a[k]??'';
  $('accountVerified').checked=Boolean(a.verified);
+ $('noDailyLimit').checked=Boolean(a.noDailyLimit);
+ $('dailyRemaining').disabled=Boolean(a.noDailyLimit);
+ syncAccountCommission();
  $('accountReference').hidden=!a.sourceUrl;
  if(a.sourceUrl) $('accountReference').href=a.sourceUrl;
  $('accountFloorLabel').textContent=a.stage==='personal'?'Personal loss floor':'Current failure floor';
@@ -106,6 +135,7 @@ function syncAccountFields(){
   : notes[a.platform] ?? 'Enter your current equity, loss floor and any venue or account limits.';
 }
 function syncSpecFields(){
+ syncAccountCommission();
  const s=selectedInstrument();
  quoteRequest?.abort();
  updateQuoteControl();
@@ -292,7 +322,13 @@ function refresh(){
  const r=sizePosition(params());currentResult=r;
  renderSummary(r);renderTicket(r);renderModes();renderUnits(r);
 }
-function updateAccount(){const a=selectedAccount();for(const k of ['equity','floor','reserve'])a[k]=inputNumber(k);for(const k of ['dailyRemaining','maxQuantity'])a[k]=optionalNumber(k);a.verified=$('accountVerified').checked;save();refresh();}
+function updateAccount(){const a=selectedAccount();for(const k of ['equity','floor','reserve'])a[k]=inputNumber(k);for(const k of ['dailyRemaining','maxQuantity'])a[k]=optionalNumber(k);a.verified=$('accountVerified').checked;a.noDailyLimit=$('noDailyLimit').checked;$('dailyRemaining').disabled=a.noDailyLimit;save();refresh();}
+function updateCommission(){
+ const account=selectedAccount(),instrument=selectedInstrument();
+ account.commissions??={};
+ account.commissions[instrument.id]=$('feePerUnit').value;
+ renderAccountReferences();save();refresh();
+}
 function updateSpec(event){
  const s=selectedInstrument();
  const fields={tickSize:'tickSize',pointValue:'pointValueQuote',conversion:'quoteToUSD',pipSize:'pipSize',qtyStep:'quantityStep',minQty:'minQuantity',minNotional:'minNotionalQuote'};
@@ -365,6 +401,7 @@ function init(){
  for(const mode of Object.keys(MODES))$('mode-'+mode).addEventListener('click',()=>setMode(mode));
  for(const k of ['equity','floor','reserve','dailyRemaining','maxQuantity'])$(k).addEventListener('input',updateAccount);
  $('accountVerified').addEventListener('change',updateAccount);
+ $('noDailyLimit').addEventListener('change',updateAccount);
  $('riskPercent').addEventListener('input',()=>{const v=inputNumber('riskPercent');state.modeFractions[state.mode]=v/100;for(const key of Object.keys(MODES))$(key+'Percent').textContent=pct(state.modeFractions[key]);save();refresh();});
  for(const side of ['long','short'])$(side+'Btn').addEventListener('click',()=>{state.side=side;for(const k of ['long','short']){$(k+'Btn').classList.toggle('active',side===k);$(k+'Btn').setAttribute('aria-pressed',String(side===k));}save();refresh();});
  $('useStop').addEventListener('change',()=>{
@@ -383,7 +420,14 @@ function init(){
  $('stopMode').addEventListener('change',switchStopMode);
  $('targetMode').addEventListener('change',updateTargetMode);
  for(const id of ['assumedMove','stopInput','plannedQuantity','rr','stressTicks'])$(id).addEventListener('input',refresh);
- for(const id of ['slippageTicks','spreadTicks','feePerUnit'])$(id).addEventListener('input',refresh);
+ for(const id of ['slippageTicks','spreadTicks'])$(id).addEventListener('input',refresh);
+ $('feePerUnit').addEventListener('input',updateCommission);
+ $('applyPublishedFee').addEventListener('click',()=>{
+  const {publishedFee}=accountReferences(selectedAccount(),selectedInstrument());
+  if(publishedFee===undefined) return;
+  $('feePerUnit').value=publishedFee;
+  updateCommission();
+ });
  for(const id of ['tickSize','pointValue','conversion','pipSize','qtyStep','minQty','minNotional'])$(id).addEventListener('input',updateSpec);
  $('lookupSpec').addEventListener('click',lookupSpec);
  $('specVerified').addEventListener('change',()=>{selectedInstrument().verified=$('specVerified').checked;save();refresh();});
