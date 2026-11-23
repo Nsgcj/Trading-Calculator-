@@ -11,22 +11,75 @@ const PERPETUAL_VENUES = [
   { id: 'bybit-linear', name: 'Bybit USDT', quote: 'USDT', suffix: 'USDT' },
 ];
 
-function accountTemplate(id, name, platform) {
-  return { id, name, platform, reserve: 0, dailyRemaining: null, maxQuantity: null, verified: false };
+export const ACCOUNT_STAGES = Object.freeze({
+  personal: 'Personal',
+  evaluation: 'Evaluation',
+  'sim-funded': 'Simulated funded',
+  'live-funded': 'Live funded',
+});
+
+const customPerpetual = { id: 'perp-custom', name: 'Custom perpetual', quote: 'quote currency', suffix: '' };
+
+function accountTemplate(id, name, platform, stage, sourceUrl) {
+  return { id, name, platform, stage, sourceUrl, reserve: 0, dailyRemaining: null, maxQuantity: null, verified: false };
 }
+
+const mffStages = 'https://help.myfundedfutures.com/en/articles/10101257-understanding-live-funded-account-at-myfunded-futures';
+const topstepStages = 'https://www.topstep.com/our-program';
+const apexStages = 'https://apextraderfunding.com/help-center/getting-started/apex-live-prop-trading-program-faq/';
+const takeProfitStages = 'https://try.takeprofittrader.com/TPT-FAQs-nf40-4-0725';
+const tradeDayStages = 'https://www.tradeday.com/';
+const earn2tradeStages = 'https://help.earn2trade.com/en/articles/3313030-what-is-the-livesim';
+const ftmoStages = 'https://ftmo.com/en/how-it-works/';
+const myFundedPerpStages = 'https://myfundedperpetuals.com/disclaimer';
 
 /** Default broker profiles are EXAMPLES, not validated current firm rules. */
 export const DEFAULT_ACCOUNTS = [
-  { id:'vest', name:'Vest Instant — example', platform:'vest', equity:500, floor:490, reserve:0, dailyRemaining:null, maxQuantity:null, verified:false },
-  { id:'mff', name:'MFF Futures — example', platform:'futures', equity:25000, floor:24000, reserve:0, dailyRemaining:null, maxQuantity:null, verified:false },
-  { id:'custom', name:'Personal account — example', platform:'custom', equity:1000, floor:900, reserve:0, dailyRemaining:null, maxQuantity:null, verified:false },
-  accountTemplate('topstep', 'Topstep — setup required', 'futures'),
-  accountTemplate('apex', 'Apex Trader Funding — setup required', 'futures'),
-  accountTemplate('take-profit-trader', 'Take Profit Trader — setup required', 'futures'),
-  accountTemplate('tradeday', 'TradeDay — setup required', 'futures'),
-  accountTemplate('earn2trade', 'Earn2Trade — setup required', 'futures'),
-  accountTemplate('ftmo', 'FTMO — setup required', 'custom'),
-  ...PERPETUAL_VENUES.map(({ id, name }) => accountTemplate(id, `${name} perpetuals — setup required`, id)),
+  { ...accountTemplate('vest', 'Vest Instant — example', 'vest', 'sim-funded', 'https://www.vestfunded.com/instant'), equity: 500, floor: 490 },
+  { ...accountTemplate('mff', 'MFF Futures — example', 'futures', 'evaluation', mffStages), equity: 25000, floor: 24000 },
+  { ...accountTemplate('custom', 'Personal account — example', 'custom', 'personal'), equity: 1000, floor: 900 },
+  accountTemplate('mff-evaluation', 'My Funded Futures — Evaluation', 'futures', 'evaluation', mffStages),
+  accountTemplate('mff-sim', 'My Funded Futures — Sim Funded', 'futures', 'sim-funded', mffStages),
+  accountTemplate('mff-live', 'My Funded Futures — Live Funded', 'futures', 'live-funded', mffStages),
+  accountTemplate('topstep', 'Topstep — Trading Combine', 'futures', 'evaluation', topstepStages),
+  accountTemplate('topstep-xfa', 'Topstep — Express Funded', 'futures', 'sim-funded', topstepStages),
+  accountTemplate('topstep-live', 'Topstep — Live Funded', 'futures', 'live-funded', topstepStages),
+  accountTemplate('apex', 'Apex Trader Funding — Evaluation', 'futures', 'evaluation', apexStages),
+  accountTemplate('apex-pa', 'Apex Trader Funding — Performance Account', 'futures', 'sim-funded', apexStages),
+  accountTemplate('apex-live', 'Apex Trader Funding — Live Prop Trading', 'futures', 'live-funded', apexStages),
+  accountTemplate('take-profit-trader', 'Take Profit Trader — Test', 'futures', 'evaluation', takeProfitStages),
+  accountTemplate('take-profit-trader-pro', 'Take Profit Trader — PRO', 'futures', 'sim-funded', takeProfitStages),
+  accountTemplate('take-profit-trader-pro-plus', 'Take Profit Trader — PRO+', 'futures', 'live-funded', takeProfitStages),
+  accountTemplate('tradeday', 'TradeDay — Evaluation', 'futures', 'evaluation', tradeDayStages),
+  accountTemplate('tradeday-sim', 'TradeDay — Funded Sim', 'futures', 'sim-funded', tradeDayStages),
+  accountTemplate('tradeday-live', 'TradeDay — Funded Live', 'futures', 'live-funded', tradeDayStages),
+  accountTemplate('earn2trade', 'Earn2Trade — Evaluation', 'futures', 'evaluation', earn2tradeStages),
+  accountTemplate('earn2trade-livesim', 'Earn2Trade — LiveSim', 'futures', 'sim-funded', earn2tradeStages),
+  accountTemplate('earn2trade-live', 'Earn2Trade — Live', 'futures', 'live-funded', earn2tradeStages),
+  accountTemplate('ftmo', 'FTMO — Challenge', 'custom', 'evaluation', ftmoStages),
+  accountTemplate('ftmo-sim', 'FTMO — FTMO Account', 'custom', 'sim-funded', ftmoStages),
+  accountTemplate('my-funded-perps-evaluation', 'MyFundedPerps — Evaluation', 'perp-custom', 'evaluation', myFundedPerpStages),
+  accountTemplate('my-funded-perps-sim', 'MyFundedPerps — Simulated Funded', 'perp-custom', 'sim-funded', myFundedPerpStages),
+  accountTemplate('ninjatrader', 'NinjaTrader — Futures', 'futures', 'personal'),
+  accountTemplate('tradovate', 'Tradovate — Futures', 'futures', 'personal'),
+  accountTemplate('ibkr-futures', 'Interactive Brokers — Futures', 'futures', 'personal'),
+  accountTemplate('ibkr-equities', 'Interactive Brokers — Stocks & ETFs', 'custom', 'personal'),
+  accountTemplate('schwab', 'Charles Schwab — Stocks & ETFs', 'custom', 'personal'),
+  accountTemplate('fidelity', 'Fidelity — Stocks & ETFs', 'custom', 'personal'),
+  accountTemplate('webull', 'Webull — Stocks & ETFs', 'custom', 'personal'),
+  accountTemplate('oanda', 'OANDA — Forex', 'custom', 'personal'),
+  accountTemplate('forex-com', 'FOREX.com — Forex', 'custom', 'personal'),
+  accountTemplate('coinbase-spot', 'Coinbase — Crypto spot', 'custom', 'personal'),
+  accountTemplate('kraken-spot', 'Kraken — Crypto spot', 'custom', 'personal'),
+  ...PERPETUAL_VENUES.map(({ id, name }) => accountTemplate(id, `${name} — Perpetuals`, id, 'personal')),
+  accountTemplate('personal-futures', 'Personal Futures', 'futures', 'personal'),
+  accountTemplate('personal-perps', 'Personal Perpetuals', 'perp-custom', 'personal'),
+  accountTemplate('prop-futures-evaluation', 'Custom Futures Prop — Evaluation', 'futures', 'evaluation'),
+  accountTemplate('prop-futures-sim', 'Custom Futures Prop — Simulated Funded', 'futures', 'sim-funded'),
+  accountTemplate('prop-futures-live', 'Custom Futures Prop — Live Funded', 'futures', 'live-funded'),
+  accountTemplate('prop-perps-evaluation', 'Custom Perpetual Prop — Evaluation', 'perp-custom', 'evaluation'),
+  accountTemplate('prop-perps-sim', 'Custom Perpetual Prop — Simulated Funded', 'perp-custom', 'sim-funded'),
+  accountTemplate('prop-perps-live', 'Custom Perpetual Prop — Live Funded', 'perp-custom', 'live-funded'),
 ];
 
 const venueInput = 'Enter the venue tick, quantity step, minimum size and current quote-to-USD rate';
@@ -162,6 +215,7 @@ export const DEFAULT_INSTRUMENTS = [
     unit: 'lots', pipSize: null, verified: false, reference: 'GC', source: 'Enter broker cash per point, tick, size step and minimum lot',
   },
   ...PERPETUAL_VENUES.flatMap(linearPerpetuals),
+  ...linearPerpetuals(customPerpetual),
 ];
 
 const finitePositive = v => Number.isFinite(v) && v > 0;
