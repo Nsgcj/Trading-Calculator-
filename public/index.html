@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en"><head>
+  <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="theme-color" content="#0c1320"/>
+  <meta name="description" content="Risk-first position sizing across futures, perpetuals, forex, stocks and crypto. Structural stops, drawdown budgets and native platform units."/>
+  <title>CHICKEN MAN | Risk Desk</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="./styles.css" />
+  <script type="module" src="./app.mjs"></script>
+</head><body>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="./" aria-label="Risk Desk home"><span class="brand-icon">C<span class="corner">M</span></span><span><strong>CHICKEN MAN</strong><small>RISK DESK <span class="edition">/ 01</span></small></span></a>
+      <div class="topbar-center"><span class="live-dot"></span> POSITION SIZING INTELLIGENCE <span class="pipe">/</span> NO LIVE BROKER CONNECTION</div>
+      <div class="topbar-actions"><span class="pill muted">LOCAL-FIRST</span><button type="button" id="resetBtn" class="text-button" title="Restore the original demo settings">Reset demo</button></div>
+    </header>
+
+    <main>
+      <div class="hero">
+        <div><div class="eyebrow"><span class="teal-point"></span> RISK FIRST. SIZE SECOND.</div><h1>Trade the setup.<br/><em>Not the account.</em></h1><p>A professional sizing desk for different platforms, contracts and risk appetites. Enter your actual invalidation level; the desk translates it into tradable quantity.</p></div>
+        <div class="hero-guide"><span>01 / THE OPERATING RULE</span><p>Define the structural stop → calculate your permitted loss → round quantity <b>down</b> to the platform's unit step.</p><small>If the minimum order is too large, the correct position is <b>NO TRADE</b>.</small></div>
+      </div>
+
+      <section class="mode-section" aria-label="Risk mode">
+        <div class="section-header"><div><div class="section-kicker">RISK PROFILE</div><h2>Choose your mode</h2></div><div class="mode-help">Percentages apply to <strong>usable drawdown</strong>, not advertised buying power.</div></div>
+        <div class="mode-grid" role="group" aria-label="Risk aggressiveness">
+          <button class="mode-card" type="button" id="mode-safe" data-mode="safe" aria-pressed="false"><span class="mode-top"><span class="mode-icon">◌</span><span class="mode-tag">LOW EXPOSURE</span></span><strong>Very Safe</strong><span>Preserve attempts and survive variance.</span><small><b id="safePercent">2%</b> of usable drawdown</small></button>
+          <button class="mode-card" type="button" id="mode-normal" data-mode="normal" aria-pressed="true"><span class="mode-top"><span class="mode-icon">◇</span><span class="mode-tag">DISCIPLINED</span></span><strong>Normal</strong><span>Balanced sizing without stretching stops.</span><small><b id="normalPercent">5%</b> of usable drawdown</small></button>
+          <button class="mode-card" type="button" id="mode-lottery" data-mode="lottery" aria-pressed="false"><span class="mode-top"><span class="mode-icon">⚡</span><span class="mode-tag">EXTREME EXPOSURE</span></span><strong>Risk the Biscuit</strong><span>Speculative. One loss can cripple the account.</span><small><b id="lotteryPercent">60%</b> of usable drawdown</small></button>
+        </div>
+        <div id="lotteryNotice" class="high-risk-note" hidden><b>High-risk scenario.</b> This is not a safe allocation. Slippage, gaps or firm rules can cause an account breach. Never assume losses stop exactly at the modeled stop.</div>
+      </section>
+
+      <section class="metric-strip" aria-label="Account position sizing summary">
+        <div class="metric"><span>ACCOUNT EQUITY</span><strong id="kEquity">—</strong><small>Editable, not a live quote</small></div>
+        <div class="metric"><span>RAW DRAWDOWN ROOM</span><strong id="kRoom">—</strong><small>Equity minus failure floor</small></div>
+        <div class="metric"><span>SELECTED RISK BUDGET</span><strong id="kBudget" class="teal">—</strong><small>Before trade sizing</small></div>
+        <div class="metric"><span>POST-STOP BUFFER</span><strong id="kBuffer">—</strong><small>Assumes the modeled fill</small></div>
+      </section>
+
+      <section class="workspace" aria-label="Risk desk workspace">
+        <div class="panel left-panel">
+          <div class="panel-title"><div><div class="section-kicker">01 / CAPITAL</div><h2>Account rules</h2></div><span class="panel-mark">◈</span></div>
+          <label for="accountSelect">Account profile</label><select id="accountSelect"></select>
+          <div class="inline-action"><button type="button" id="addAccountBtn" class="link-button">+ Create an account profile</button></div>
+          <div id="newAccountPanel" class="new-panel" hidden><label for="newAccountName">New account name</label><input id="newAccountName" placeholder="e.g. MFF account 2" maxlength="70"/><label for="newAccountPlatform" style="margin-top:10px">Contract platform</label><select id="newAccountPlatform"><option value="futures">Futures (MFF / CME)</option><option value="vest">Vest Perpetuals</option><option value="custom">Forex, Crypto, Stocks / Custom</option></select><button id="saveAccountBtn" class="small-primary" type="button">Create profile</button></div>
+          <div class="field-row"><div class="field"><label for="equity">Current equity <span>USD</span></label><input type="number" id="equity" step="any" min="0" inputmode="decimal" /></div><div class="field"><label for="floor">Current failure floor <span>USD</span></label><input type="number" id="floor" step="any" min="0" inputmode="decimal" /></div></div>
+          <div class="field-row"><div class="field"><label for="reserve">Extra safety reserve <span>USD</span></label><input type="number" id="reserve" step="any" min="0" inputmode="decimal" /></div><div class="field"><label for="dailyRemaining">Daily risk remaining <span>USD</span></label><input type="number" id="dailyRemaining" step="any" min="0" inputmode="decimal" placeholder="Not set" /></div></div>
+          <div class="field-row"><div class="field"><label for="maxQuantity">Account max quantity</label><input type="number" id="maxQuantity" step="any" min="0" inputmode="decimal" placeholder="Not set"/></div><div class="field"><label for="riskPercent">Risk fraction <span>% of usable room</span></label><input type="number" id="riskPercent" step="0.5" min="0.01" max="100" inputmode="decimal"/></div></div>
+          <div class="check-row"><input type="checkbox" id="accountVerified"/><label for="accountVerified">I checked this account's live floor, daily limits and position caps on my platform.</label></div>
+          <div class="footnote" id="accountNote">Profiles are examples. Update the actual floor after every relevant equity or trailing-drawdown change.</div>
+          <div class="floor-bar"><div class="floor-title"><span>Available to lose</span><b id="floorText">—</b></div><div class="bar"><div id="floorFill"></div></div><small>Safety reserve is excluded from sizing. Broker liquidation may occur before a protective stop.</small></div>
+        </div>
+
+        <div class="panel center-panel">
+          <div class="panel-title"><div><div class="section-kicker">02 / THE SETUP</div><h2>Trade parameters</h2></div><span class="panel-mark">⌗</span></div>
+          <label for="instrumentSelect">Instrument & platform contract</label><select id="instrumentSelect"></select>
+          <div class="inline-action"><button type="button" id="addInstrumentBtn" class="link-button">+ Duplicate & customize instrument</button></div>
+          <div id="newInstrumentPanel" class="new-panel" hidden><div class="field-row"><div class="field"><label for="newInstrumentSymbol">Symbol</label><input id="newInstrumentSymbol" placeholder="e.g. XAUUSD" maxlength="24" /></div><div class="field"><label for="newInstrumentName">Description</label><input id="newInstrumentName" placeholder="Gold CFD" maxlength="80" /></div></div><button type="button" id="saveInstrumentBtn" class="small-primary">Create custom instrument</button></div>
+          <div class="direction-toggle" role="group" aria-label="Trade direction"><button type="button" id="longBtn" class="active" aria-pressed="true">↑ Long</button><button type="button" id="shortBtn" aria-pressed="false">↓ Short</button></div>
+          <div class="field-row"><div class="field"><label for="entry">Entry price</label><input type="number" id="entry" value="25000" step="any" inputmode="decimal" /></div><div class="field"><label for="stopMode">Stop expressed as</label><select id="stopMode"><option value="price">Actual stop price</option><option value="points">Points / price movement</option><option value="ticks">Ticks</option><option value="pips">Pips (FX only)</option></select></div></div>
+          <div class="field-row"><div class="field"><label for="stopInput" id="stopLabel">Structural stop price</label><input type="number" id="stopInput" value="24970" step="any" inputmode="decimal" /></div><div class="field"><label for="rr">Target R multiple</label><input type="number" id="rr" step="0.25" min="0.01" value="3" inputmode="decimal"/></div></div>
+          <p class="micro-note">Set the stop at technical invalidation (e.g. beyond structure + appropriate volatility buffer), not at a convenient percentage of account size.</p>
+          <details class="advanced" open><summary>Contract specification & execution costs <span>EDITABLE</span></summary>
+            <div class="field-row"><div class="field"><label for="tickSize">Minimum price tick</label><input id="tickSize" type="number" step="any" min="0" /></div><div class="field"><label for="pointValue">Cash per 1.0 price move <span>quote ccy / unit</span></label><input id="pointValue" type="number" step="any" min="0" /></div></div>
+            <div class="field-row"><div class="field"><label for="conversion">Quote currency → USD rate</label><input id="conversion" type="number" step="any" min="0" /></div><div class="field"><label for="pipSize">Pip size <span>FX only</span></label><input id="pipSize" type="number" step="any" min="0" placeholder="N/A" /></div></div>
+            <div class="field-row"><div class="field"><label for="qtyStep">Quantity increment</label><input id="qtyStep" type="number" step="any" min="0" /></div><div class="field"><label for="minQty">Minimum order size</label><input id="minQty" type="number" step="any" min="0" /></div></div>
+            <div class="field-row thirds"><div class="field"><label for="slippageTicks">Slippage <span>ticks</span></label><input id="slippageTicks" type="number" step="any" min="0" value="2" /></div><div class="field"><label for="spreadTicks">Spread <span>ticks</span></label><input id="spreadTicks" type="number" step="any" min="0" value="0" /></div><div class="field"><label for="feePerUnit">Round-trip fee <span>$/unit</span></label><input id="feePerUnit" type="number" step="any" min="0" value="0" /></div></div>
+            <div class="field-row"><div class="field"><label for="stressTicks">Extra stress slippage <span>ticks</span></label><input id="stressTicks" type="number" step="any" min="0" value="2" /></div><div class="field spec-check"><div class="check-row"><input type="checkbox" id="specVerified"/><label for="specVerified">I verified these contract units with the venue.</label></div></div></div>
+            <div id="specSource" class="spec-source">—</div>
+          </details>
+        </div>
+
+        <div class="panel right-panel">
+          <div class="panel-title"><div><div class="section-kicker">03 / THE DECISION</div><h2>Position ticket</h2></div><span class="state-chip" id="statusChip">PENDING</span></div>
+          <div class="ticket">
+            <div class="ticket-eyebrow">MAX POSITION SIZE · NATIVE PLATFORM UNITS</div>
+            <div class="ticket-big"><strong id="quantity">—</strong><span id="quantityUnit">units</span></div>
+            <p id="quantityHint">Set your account, instrument and stop.</p>
+            <div class="ticket-divider"></div>
+            <div class="ticket-line"><span>Planned stop loss</span><b class="red" id="actualRisk">—</b></div>
+            <div class="ticket-line"><span>Target net profit <small>(model)</small></span><b class="teal" id="targetProfit">—</b></div>
+            <div class="ticket-line"><span>Effective net R : R</span><b id="effectiveRR">—</b></div>
+            <div class="ticket-line"><span>Stop / TP price</span><b id="levels">—</b></div>
+            <div class="ticket-line"><span>Stop width</span><b id="stopWidth">—</b></div>
+            <div class="ticket-line"><span>Extra-slip stress loss</span><b id="stressRisk">—</b></div>
+          </div>
+          <div class="status-message" id="statusMessage" role="status">Waiting for validated trade details.</div>
+          <div class="warning-list" id="warningList" aria-live="polite"></div>
+          <button type="button" id="copyBtn" class="copy-button" disabled>Copy position plan <span>↗</span></button>
+        </div>
+      </section>
+
+      <section class="bottom-grid">
+        <div class="panel secondary-panel"><div class="panel-title"><div><div class="section-kicker">04 / COMPARATIVE RISK</div><h2>Same setup, three modes</h2></div></div>
+          <div class="table-wrap"><table><thead><tr><th>MODE</th><th>RISK CAP</th><th>NATIVE SIZE</th><th>ACTUAL LOSS</th><th>STATUS</th></tr></thead><tbody id="modeTable"></tbody></table></div>
+          <p class="fine">A preset may show NO TRADE when the exchange's minimum contract is too large. That is intentional.</p>
+        </div>
+        <div class="panel secondary-panel"><div class="panel-title"><div><div class="section-kicker">05 / UNIT TRANSLATOR</div><h2>Speak every platform</h2></div></div>
+          <div class="unit-card"><span>VALUE OF ONE NATIVE UNIT</span><strong id="unitPoint">—</strong><small id="unitTick">—</small></div>
+          <div class="unit-items" id="unitBridge"></div>
+          <p class="fine">Equivalents compare P&amp;L per price point, not available position increments, margin or execution compatibility.</p>
+        </div>
+      </section>
+      <footer><div><strong>CHICKEN MAN / RISK DESK</strong> — Risk calculations, not trade signals or order execution. Model outputs are estimates, not guaranteed fills or account-rule compliance.</div><div>LOCAL DATA ONLY <span>·</span> V1.0</div></footer>
+    </main>
+  </div>
+</body></html>
