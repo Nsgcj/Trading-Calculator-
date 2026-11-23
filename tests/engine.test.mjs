@@ -241,3 +241,17 @@ test('tick alignment cannot legitimize a wrong-sided stop input', () => {
   const result = sizePosition({...base, riskFraction: 0.6, entry: 25000.10, stopInput: 25000.15});
   assert.equal(result.status, 'BLOCKED');
 });
+
+test('funded templates require their own account equity and failure floor', () => {
+  const funded = DEFAULT_ACCOUNTS.filter(profile => profile.id !== 'vest' && ['sim-funded', 'live-funded'].includes(profile.stage));
+  assert.ok(funded.some(profile => profile.stage === 'sim-funded'));
+  assert.ok(funded.some(profile => profile.stage === 'live-funded'));
+  for (const profile of funded) {
+    assert.equal(profile.verified, false);
+    const contract = DEFAULT_INSTRUMENTS.find(spec => spec.platform === profile.platform);
+    assert.ok(contract, profile.name);
+    const result = sizePosition({...base, account: profile, instrument: contract, riskFraction: 0.05});
+    assert.equal(result.status, 'BLOCKED');
+    assert.match(result.errors[0], /account equity, failure floor/);
+  }
+});

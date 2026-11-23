@@ -65,6 +65,10 @@ Conservative slippage stress is shown separately. Models may miss gaps, stop rej
 
 Data is **not** automatically updated. Contract specification status becomes unverified if manually edited. Account verification is a user self-attestation; not an API check. All risk modes are mathematical scenarios, not statistically validated presets.
 
+### Personal, evaluation, and funded profiles
+
+Use the **Account profile** dropdown to choose a personal broker, evaluation, sim-funded, or live-funded profile. Select **Create Simulated funded profile** or **Create Live funded profile** to start the next stage on the same contract platform. You can choose any stage when creating a profile. The new profile starts with blank equity and floor so it uses the new account’s rules, while the earlier profile retains its own settings. Profiles are stored in this browser.
+
 ### Finding an instrument
 
 The instrument dropdown shows the full catalog, grouped by platform and asset class. The current account's instruments appear first. Choosing a contract on another platform switches to a compatible saved account and recalculates the budget from that account's inputs. Your saved custom instruments remain in the dropdown.

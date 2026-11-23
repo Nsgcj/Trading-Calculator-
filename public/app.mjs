@@ -1,6 +1,6 @@
 import {supportsContractLookup,fetchContractSpec} from './contract-specs.mjs';
 import {getCurrentPrice,supportsCurrentPrice} from './quotes.mjs';
-import {MODES,DEFAULT_ACCOUNTS,DEFAULT_INSTRUMENTS,sizePosition,getHeadroom,getRiskBudget,usd,fmt} from './engine.mjs';
+import {ACCOUNT_STAGES,MODES,DEFAULT_ACCOUNTS,DEFAULT_INSTRUMENTS,sizePosition,getHeadroom,getRiskBudget,usd,fmt} from './engine.mjs';
 const STORAGE_KEY='chicken-man-riskdesk-v1';
 const $=id=>document.getElementById(id);
 const clone=o=>structuredClone(o);
@@ -18,7 +18,10 @@ let state=(()=>{
   if (saved?.accounts?.length && Array.isArray(saved.accounts) && saved?.instruments?.length && Array.isArray(saved.instruments) && saved.modeFractions) {
    return {
     ...saved,
-    accounts: addMissingPresets(saved.accounts, DEFAULT_ACCOUNTS),
+    accounts: addMissingPresets(saved.accounts, DEFAULT_ACCOUNTS).map(account=>{
+     const preset=DEFAULT_ACCOUNTS.find(item=>item.id===account.id);
+     return account.stage || !preset?.stage ? account : {...account,stage:preset.stage};
+    }),
     instruments: addMissingPresets(saved.instruments, DEFAULT_INSTRUMENTS).map(instrument=>{
      if(instrument.sourceUrl || instrument.platform!=='futures') return instrument;
      const official=DEFAULT_INSTRUMENTS.find(preset=>preset.id===instrument.id);
@@ -38,12 +41,23 @@ function selectedAccount(){return state.accounts.find(a=>a.id===state.accountId)
 function selectedInstrument(){return state.instruments.find(s=>s.id===state.instrumentId)??{};}
 function getApplicable(){return state.instruments.filter(s=>s.platform===selectedAccount().platform);}
 function fillAccounts(){
- $('accountSelect').replaceChildren(...state.accounts.map(a=>new Option(a.name,a.id)));
+ const groups=new Map();
+ for(const account of state.accounts){
+  const label=ACCOUNT_STAGES[account.stage]??'Saved profiles';
+  if(!groups.has(label)){
+   const group=document.createElement('optgroup');
+   group.label=label;
+   groups.set(label,group);
+  }
+  groups.get(label).append(new Option(account.name,account.id));
+ }
+ $('accountSelect').replaceChildren(...groups.values());
  if(!state.accounts.some(a=>a.id===state.accountId))state.accountId=state.accounts[0].id;
  $('accountSelect').value=state.accountId;
 }
 const platformNames={
  vest:'Vest',futures:'Futures',custom:'Personal / FX',hyperliquid:'Hyperliquid',
+ vest:'Vest','perp-custom':'Custom Perpetuals',futures:'Futures',custom:'Personal / FX',hyperliquid:'Hyperliquid',
  'binance-linear':'Binance USDⓈ-M','bybit-linear':'Bybit USDT',
 };
 function fillInstruments(restoreAccountChoice=false){
@@ -71,15 +85,25 @@ function fillInstruments(restoreAccountChoice=false){
  $('instrumentSelect').value=state.instrumentId;
  $('instrumentAccount').textContent=`Sizing account: ${account.name}. Choosing a contract on another platform switches accounts.`;
 }
+const nextStage={evaluation:'sim-funded','sim-funded':'live-funded'};
 function syncAccountFields(){
  const a=selectedAccount();
  for(const k of ['equity','floor','reserve','dailyRemaining','maxQuantity'])$(k).value=a[k]??'';
  $('accountVerified').checked=Boolean(a.verified);
+ $('accountReference').hidden=!a.sourceUrl;
+ if(a.sourceUrl) $('accountReference').href=a.sourceUrl;
+ $('accountFloorLabel').textContent=a.stage==='personal'?'Personal loss floor':'Current failure floor';
+ const next=nextStage[a.stage];
+ $('createFundedBtn').hidden=!next;
+ if(next) $('createFundedBtn').textContent=`+ Create ${ACCOUNT_STAGES[next]} profile`;
  const notes = {
   vest: 'Verify Vest contract multipliers and account floor. The $500/$490 profile is an illustration.',
   futures: 'Enter the current failure floor, daily loss allowance and position limits for your prop firm program.',
  };
- $('accountNote').textContent = notes[a.platform] ?? 'Enter your current equity, loss floor and any venue or account limits. Keep these values up to date.';
+ $('accountNote').textContent = a.stage==='sim-funded' || a.stage==='live-funded'
+  ? 'Enter this funded account’s own equity, current floor, daily loss allowance and position cap.'
+  : a.stage==='personal'?'Enter equity and the minimum balance you want to keep. Add a daily loss limit or position cap if applicable.'
+  : notes[a.platform] ?? 'Enter your current equity, loss floor and any venue or account limits.';
 }
 function syncSpecFields(){
  const s=selectedInstrument();
@@ -299,7 +323,17 @@ function switchStopMode(){
  if (next!=='budget') lastStopMode=next;
  setStopLabel();refresh();
 }
+function openAccountPanel(fromAccount){
+ const panel=$('newAccountPanel');
+ const current=selectedAccount();
+ panel.hidden=false;
+ $('newAccountPlatform').value=current.platform;
+ $('newAccountStage').value=fromAccount?nextStage[current.stage]:'personal';
+ $('newAccountName').value=fromAccount?`${current.name.replace(/\s*[—·]\s*(Evaluation|Simulated funded|Sim Funded|Live Funded|example|setup required).*$/i,'')} · ${ACCOUNT_STAGES[nextStage[current.stage]]}`:'';
+ $('newAccountName').focus();
+}
 function init(){
+ $('newAccountStage').replaceChildren(...Object.entries(ACCOUNT_STAGES).map(([id,label])=>new Option(label,id)));
  fillAccounts();fillInstruments();syncAccountFields();syncSpecFields();setMode(state.mode||'normal');
  $('accountSelect').addEventListener('change',()=>{
   const previousInstrument=state.instrumentId;
@@ -353,12 +387,17 @@ function init(){
  for(const id of ['tickSize','pointValue','conversion','pipSize','qtyStep','minQty','minNotional'])$(id).addEventListener('input',updateSpec);
  $('lookupSpec').addEventListener('click',lookupSpec);
  $('specVerified').addEventListener('change',()=>{selectedInstrument().verified=$('specVerified').checked;save();refresh();});
- $('addAccountBtn').addEventListener('click',()=>{$('newAccountPanel').hidden=!$('newAccountPanel').hidden;});
+ $('addAccountBtn').addEventListener('click',()=>{
+  if($('newAccountPanel').hidden) openAccountPanel(false);
+  else $('newAccountPanel').hidden=true;
+ });
+ $('createFundedBtn').addEventListener('click',()=>openAccountPanel(true));
  $('saveAccountBtn').addEventListener('click',()=>{
   const name=$('newAccountName').value.trim();if(!name){$('newAccountName').focus();return;}
   const platform = $('newAccountPlatform').value;
   const id = 'account-' + Date.now();
-  const newAccount = { id, name, platform, reserve: 0, dailyRemaining: null, maxQuantity: null, verified: false };
+  const stage=$('newAccountStage').value;
+  const newAccount = { id, name, platform, stage, reserve: 0, dailyRemaining: null, maxQuantity: null, verified: false };
   state.accounts.push(newAccount);state.accountId=id;
   fillAccounts();fillInstruments(true);syncAccountFields();syncSpecFields();$('newAccountPanel').hidden=true;$('newAccountName').value='';save();refresh();
  });
