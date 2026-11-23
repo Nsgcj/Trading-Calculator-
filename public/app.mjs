@@ -27,17 +27,33 @@ let state=(()=>{
 let currentResult=null,lastStopMode='price',quoteRequest,exampleEntry=true;
 function save(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));}catch{}}
 function selectedAccount(){return state.accounts.find(a=>a.id===state.accountId)||state.accounts[0];}
-function selectedInstrument(){return state.instruments.find(s=>s.id===state.instrumentId)||state.instruments[0];}
+function selectedInstrument(){return state.instruments.find(s=>s.id===state.instrumentId)??{};}
 function getApplicable(){return state.instruments.filter(s=>s.platform===selectedAccount().platform);}
 function fillAccounts(){
  $('accountSelect').replaceChildren(...state.accounts.map(a=>new Option(a.name,a.id)));
  if(!state.accounts.some(a=>a.id===state.accountId))state.accountId=state.accounts[0].id;
  $('accountSelect').value=state.accountId;
 }
-function fillInstruments(chooseDefault=false){
+function fillInstruments(restoreAccountChoice=false){
+ const account=selectedAccount();
  const available=getApplicable();
- if(chooseDefault || !available.some(s=>s.id===state.instrumentId))state.instrumentId=available[0]?.id||state.instruments[0].id;
- $('instrumentSelect').replaceChildren(...available.map(s=>new Option(`${s.symbol}   ·   ${s.name}`,s.id)));
+ const preferred=restoreAccountChoice?account.instrumentId:state.instrumentId;
+ const chosen=available.find(instrument=>instrument.id===preferred)
+  ?? available.find(instrument=>instrument.id===state.instrumentId)
+  ?? available[0];
+ state.instrumentId=chosen?.id??'';
+ account.instrumentId=state.instrumentId;
+ const groups=new Map();
+ for(const instrument of available){
+  const label=instrument.asset||'Other';
+  if(!groups.has(label)){
+   const group=document.createElement('optgroup');
+   group.label=label;
+   groups.set(label,group);
+  }
+  groups.get(label).append(new Option(`${instrument.symbol} · ${instrument.name}`,instrument.id));
+ }
+ $('instrumentSelect').replaceChildren(...groups.values());
  $('instrumentSelect').value=state.instrumentId;
 }
 function syncAccountFields(){
@@ -60,10 +76,10 @@ function syncSpecFields(){
  $('specVerified').checked=Boolean(s.verified);
  $('specSource').textContent=`${s.source||'Custom broker specification'} · Native order size: ${s.unit} · ${s.symbol}. Price feed is NOT live.`;
  const refPrice={NQ:25000,ES:6000,GC:4000,CL:80,RTY:2200,YM:42000,SI:35,NG:3,EURUSD:1.1,USDJPY:150,GBPUSD:1.3,AUDUSD:0.65,USDCAD:1.4,EURJPY:165,BTC:90000,ETH:3000,SOL:150,STOCK:100,OTHER:100};
- const price=refPrice[s.reference]??100;
- $('entry').value=$('useStop').checked?price:'';
+ const price=refPrice[s.reference];
+ $('entry').value=$('useStop').checked?(price??''):'';
  const dist={NQ:30,ES:10,GC:10,CL:1,RTY:5,YM:50,SI:0.1,NG:0.05,EURUSD:0.002,USDJPY:0.2,GBPUSD:0.002,AUDUSD:0.002,USDCAD:0.002,EURJPY:0.2,BTC:500,ETH:25,SOL:2,STOCK:2,OTHER:2}[s.reference]??2;
- $('stopInput').value=Number((price+(state.side==='short'?dist:-dist)).toPrecision(11));
+ $('stopInput').value=price===undefined?'':Number((price+(state.side==='short'?dist:-dist)).toPrecision(11));
  if ($('stopMode').value!=='budget') $('stopMode').value='price';
  $('plannedQuantity').value='';
  $('plannedQuantityUnit').textContent=s.unit;
@@ -132,7 +148,8 @@ function params(fraction=state.modeFractions[state.mode]){
 function renderSummary(r){
  const a=selectedAccount(),h=getHeadroom(a);
  $('kEquity').textContent=usd(Number(a.equity));$('kRoom').textContent=h?usd(h.raw):'—';
- $('kBudget').textContent=r?.budget===undefined?'—':usd(r.budget);
+ $('kBudget').textContent=usd(r?.budget);
+ $('budgetAccount').textContent=a.name;
  $('kBuffer').textContent=r?.risk===undefined?'—':usd(r.reservePostStop);
  $('floorText').textContent=h?`${usd(h.usable)} usable`:'—';
  $('floorFill').style.width=h&&h.raw>0?`${Math.min(100,Math.max(0,(r?.budget??0)/h.raw*100))}%`:'0%';
@@ -142,7 +159,8 @@ function renderTicket(r){
  $('statusChip').className='state-chip '+(r?.status==='CALCULATED'?'calculated':r?.status==='BLOCKED'?'blocked':'');
  $('statusChip').textContent=r?.status==='CALCULATED' && r.stopMode==='none'?'SCENARIO':r?.status??'PENDING';
  $('quantity').textContent=good?fmt(r.quantity,10):'NO TRADE';
- $('quantityUnit').textContent=s.unit;
+ $('quantityUnit').textContent=s.unit??'';
+ $('allocationUsed').textContent=good?usd(Math.max(0,r.budget-r.risk)):'—';
  const noStop=!$('useStop').checked;
  const fixedSize=!noStop && $('stopMode').value==='budget';
  $('bufferLabel').textContent=noStop?'MODELED BUFFER':'POST-STOP BUFFER';
@@ -210,8 +228,15 @@ function switchStopMode(){
 }
 function init(){
  fillAccounts();fillInstruments();syncAccountFields();syncSpecFields();setMode(state.mode||'normal');
- $('accountSelect').addEventListener('change',()=>{state.accountId=$('accountSelect').value;fillInstruments(true);syncAccountFields();syncSpecFields();save();refresh();});
- $('instrumentSelect').addEventListener('change',()=>{state.instrumentId=$('instrumentSelect').value;syncSpecFields();save();refresh();});
+ $('accountSelect').addEventListener('change',()=>{
+  const previousInstrument=state.instrumentId;
+  state.accountId=$('accountSelect').value;
+  fillInstruments(true);
+  syncAccountFields();
+  if(previousInstrument!==state.instrumentId) syncSpecFields();
+  save();refresh();
+ });
+ $('instrumentSelect').addEventListener('change',()=>{state.instrumentId=$('instrumentSelect').value;selectedAccount().instrumentId=state.instrumentId;syncSpecFields();save();refresh();});
  for(const mode of Object.keys(MODES))$('mode-'+mode).addEventListener('click',()=>setMode(mode));
  for(const k of ['equity','floor','reserve','dailyRemaining','maxQuantity'])$(k).addEventListener('input',updateAccount);
  $('accountVerified').addEventListener('change',updateAccount);

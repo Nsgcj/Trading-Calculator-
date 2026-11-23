@@ -34,7 +34,7 @@
       <section class="metric-strip" aria-label="Account position sizing summary">
         <div class="metric"><span>ACCOUNT EQUITY</span><strong id="kEquity">—</strong><small>Editable, not a live quote</small></div>
         <div class="metric"><span>RAW DRAWDOWN ROOM</span><strong id="kRoom">—</strong><small>Equity minus failure floor</small></div>
-        <div class="metric"><span>SELECTED RISK BUDGET</span><strong id="kBudget" class="teal">—</strong><small>Before trade sizing</small></div>
+        <div class="metric"><span>SELECTED RISK BUDGET</span><strong id="kBudget" class="teal">—</strong><small id="budgetAccount">—</small></div>
         <div class="metric"><span id="bufferLabel">POST-STOP BUFFER</span><strong id="kBuffer">—</strong><small>Assumes the modeled fill</small></div>
       </section>
 
@@ -101,6 +101,7 @@
             <div class="ticket-line"><span>Take-profit price</span><b id="targetPrice">—</b></div>
             <div class="ticket-line"><span id="widthLabel">Stop width</span><b id="stopWidth">—</b></div>
             <div class="ticket-line" id="scenarioPriceRow" hidden><span>Adverse scenario price</span><b id="scenarioPrice">—</b></div>
+            <div class="ticket-line"><span>Unused risk budget</span><b id="allocationUsed">—</b></div>
             <div class="ticket-line"><span>Estimated exposure <small>USD</small></span><b id="notional">—</b></div>
             <div class="ticket-line"><span>Extra-slip stress loss</span><b id="stressRisk">—</b></div>
           </div>

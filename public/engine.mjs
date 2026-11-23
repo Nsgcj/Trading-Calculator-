@@ -34,6 +34,12 @@ const perpAssets = [
   { coin: 'BTC', name: 'Bitcoin' },
   { coin: 'ETH', name: 'Ether' },
   { coin: 'SOL', name: 'Solana' },
+  { coin: 'XRP', name: 'XRP' },
+  { coin: 'DOGE', name: 'Dogecoin' },
+  { coin: 'ADA', name: 'Cardano' },
+  { coin: 'LINK', name: 'Chainlink' },
+  { coin: 'AVAX', name: 'Avalanche' },
+  { coin: 'SUI', name: 'Sui' },
 ];
 
 function linearPerpetuals({ id, name, quote, suffix }) {
@@ -65,9 +71,9 @@ function fxTemplate(symbol, quote, tickSize, pipSize) {
   };
 }
 
-function shareTemplate(symbol, name) {
+function shareTemplate(symbol, name, asset) {
   return {
-    id: `c-${symbol.toLowerCase()}`, platform: 'custom', symbol, name, asset: 'ETF',
+    id: `c-${symbol.toLowerCase()}`, platform: 'custom', symbol, name, asset,
     tickSize: 0.01, pointValueQuote: 1, quoteToUSD: 1, quantityStep: 1, minQuantity: 1,
     unit: 'shares', pipSize: null, verified: false, reference: 'STOCK',
     source: 'Illustrative USD whole-share sizing; verify broker price and share increments',
@@ -97,13 +103,38 @@ export const DEFAULT_INSTRUMENTS = [
   futuresTemplate('YM', 'E-mini Dow', 'YM', 1, 5),
   futuresTemplate('CL', 'WTI Crude Oil', 'CL', 0.01, 1000),
   futuresTemplate('SI', 'Silver Futures', 'SI', 0.005, 5000),
+  futuresTemplate('SIL', 'Micro Silver Futures', 'SI', 0.005, 1000),
   futuresTemplate('NG', 'Natural Gas Futures', 'NG', 0.001, 10000),
+  futuresTemplate('MNG', 'Micro Henry Hub Natural Gas', 'NG', 0.001, 1000),
+  futuresTemplate('6E', 'Euro FX Futures', 'EURUSD', 0.00005, 125000),
+  futuresTemplate('M6E', 'Micro EUR/USD Futures', 'EURUSD', 0.0001, 12500),
+  futuresTemplate('MBT', 'Micro Bitcoin Futures', 'BTC', 5, 0.1),
+  futuresTemplate('MET', 'Micro Ether Futures', 'ETH', 0.5, 0.1),
   fxTemplate('GBPUSD', 'USD', 0.00001, 0.0001),
   fxTemplate('AUDUSD', 'USD', 0.00001, 0.0001),
   fxTemplate('USDCAD', 'CAD', 0.00001, 0.0001),
   fxTemplate('EURJPY', 'JPY', 0.001, 0.01),
-  shareTemplate('SPY', 'SPDR S&P 500 ETF'),
-  shareTemplate('QQQ', 'Invesco QQQ ETF'),
+  fxTemplate('NZDUSD', 'USD', 0.00001, 0.0001),
+  fxTemplate('USDCHF', 'CHF', 0.00001, 0.0001),
+  fxTemplate('EURGBP', 'GBP', 0.00001, 0.0001),
+  fxTemplate('GBPJPY', 'JPY', 0.001, 0.01),
+  shareTemplate('SPY', 'SPDR S&P 500 ETF', 'ETF'),
+  shareTemplate('QQQ', 'Invesco QQQ ETF', 'ETF'),
+  shareTemplate('IWM', 'iShares Russell 2000 ETF', 'ETF'),
+  shareTemplate('DIA', 'SPDR Dow Jones Industrial Average ETF', 'ETF'),
+  shareTemplate('VOO', 'Vanguard S&P 500 ETF', 'ETF'),
+  shareTemplate('VTI', 'Vanguard Total Stock Market ETF', 'ETF'),
+  shareTemplate('GLD', 'SPDR Gold Shares', 'ETF'),
+  shareTemplate('SLV', 'iShares Silver Trust', 'ETF'),
+  shareTemplate('TLT', 'iShares 20+ Year Treasury Bond ETF', 'ETF'),
+  shareTemplate('AAPL', 'Apple', 'Equity'),
+  shareTemplate('MSFT', 'Microsoft', 'Equity'),
+  shareTemplate('NVDA', 'NVIDIA', 'Equity'),
+  shareTemplate('AMZN', 'Amazon', 'Equity'),
+  shareTemplate('META', 'Meta Platforms', 'Equity'),
+  shareTemplate('GOOGL', 'Alphabet Class A', 'Equity'),
+  shareTemplate('TSLA', 'Tesla', 'Equity'),
+  shareTemplate('AMD', 'Advanced Micro Devices', 'Equity'),
   ...perpAssets.filter(({ coin }) => coin !== 'BTC').map(({ coin, name }) => ({
     id: `c-${coin.toLowerCase()}`, platform: 'custom', symbol: `${coin}USD`,
     name: `${name} spot`, asset: 'Crypto spot', tickSize: null, pointValueQuote: 1,
@@ -167,6 +198,7 @@ export function sizePosition(p) {
   const assumedMovePercent=numeric(p.assumedMovePercent);
   const tick=numeric(s.tickSize), pointQuote=numeric(s.pointValueQuote), fx=numeric(s.quoteToUSD), step=numeric(s.quantityStep), minQ=numeric(s.minQuantity);
   const slip=numeric(p.slippageTicks ?? 0), spread=numeric(p.spreadTicks ?? 0), fees=numeric(p.feePerUnit ?? 0), stressExtra=numeric(p.stressExtraTicks ?? 2);
+  if (a.platform && s.platform && a.platform!==s.platform) errors.push('Choose an instrument available for the selected account platform.');
   if (!h) errors.push('Enter valid account equity, failure floor and safety reserve.');
   else if (h.raw <= 0) errors.push('Account equity is at/below the failure floor. No trade.');
   else if (h.usable <= 0) errors.push('No usable drawdown remains after the safety reserve.');

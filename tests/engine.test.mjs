@@ -33,7 +33,7 @@ test('not enough budget to trade 1 micro contract -> blocked',()=>{
  assert.equal(r.status,'BLOCKED');
 });
 test('manual USDJPY quote-to-USD rate required',()=>{
- const r=sizePosition({...base,instrument:DEFAULT_INSTRUMENTS.find(x=>x.symbol==='USDJPY'),riskFraction:.6});
+ const r=sizePosition({...base,account:DEFAULT_ACCOUNTS[2],instrument:DEFAULT_INSTRUMENTS.find(x=>x.symbol==='USDJPY'),riskFraction:.6});
  assert.equal(r.status,'BLOCKED');
 });
 test('EURUSD pip distance converts into USD risk',()=>{
@@ -217,4 +217,10 @@ test('invalid adverse move assumptions block sizing without a stop', () => {
     assert.equal(result.status, 'BLOCKED');
     assert.ok(result.quantity == null);
   }
+});
+
+test('blocks sizing with a contract from another account platform', () => {
+  const result = sizePosition({ ...base, account: DEFAULT_ACCOUNTS[1], riskFraction: 0.6 });
+  assert.equal(result.status, 'BLOCKED');
+  assert.match(result.errors[0], /selected account platform/);
 });
