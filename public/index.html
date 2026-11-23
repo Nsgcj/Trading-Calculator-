@@ -81,9 +81,17 @@
             <div class="field-row"><div class="field"><label for="tickSize">Minimum price tick</label><input id="tickSize" type="number" step="any" min="0" /></div><div class="field"><label for="pointValue">Cash per 1.0 price move <span>quote ccy / unit</span></label><input id="pointValue" type="number" step="any" min="0" /></div></div>
             <div class="field-row"><div class="field"><label for="conversion">Quote currency → USD rate</label><input id="conversion" type="number" step="any" min="0" /></div><div class="field"><label for="pipSize">Pip size <span>FX only</span></label><input id="pipSize" type="number" step="any" min="0" placeholder="N/A" /></div></div>
             <div class="field-row"><div class="field"><label for="qtyStep">Quantity increment</label><input id="qtyStep" type="number" step="any" min="0" /></div><div class="field"><label for="minQty">Minimum order size</label><input id="minQty" type="number" step="any" min="0" /></div></div>
-            <div class="field-row thirds"><div class="field"><label for="slippageTicks">Slippage <span>ticks</span></label><input id="slippageTicks" type="number" step="any" min="0" value="2" /></div><div class="field"><label for="spreadTicks">Spread <span>ticks</span></label><input id="spreadTicks" type="number" step="any" min="0" value="0" /></div><div class="field"><label for="feePerUnit">Round-trip fee <span>$/unit</span></label><input id="feePerUnit" type="number" step="any" min="0" value="0" /></div></div>
+            <div class="field-row thirds"><div class="field"><label for="slippageTicks">Total modeled slippage <span>ticks</span></label><input id="slippageTicks" type="number" step="any" min="0" value="2" /></div><div class="field"><label for="spreadTicks">Additional spread <span>ticks</span></label><input id="spreadTicks" type="number" step="any" min="0" value="0" /></div><div class="field"><label for="feePerUnit">Round-trip fee <span>$ per native unit</span></label><input id="feePerUnit" type="number" step="any" min="0" value="0" /></div></div>
             <div class="field-row"><div class="field"><label for="stressTicks">Extra stress slippage <span>ticks</span></label><input id="stressTicks" type="number" step="any" min="0" value="2" /></div><div class="field spec-check"><div class="check-row"><input type="checkbox" id="specVerified"/><label for="specVerified">I verified these contract units with the venue.</label></div></div></div>
+            <p class="micro-note">Enter estimated entry and exit slippage together. Add spread only if it is separate from that estimate. Enter both sides of commissions and fees in USD per contract, lot, share, or coin. Defaults are examples.</p>
+            <div class="check-row"><input type="checkbox" id="costsConfirmed"/><label for="costsConfirmed">I checked these cost estimates for this account and instrument.</label></div>
+            <div class="field-row">
+              <div class="field"><label for="minNotional">Minimum order value <span>quote currency</span></label><input id="minNotional" type="number" step="any" min="0" placeholder="Not set" /></div>
+              <div class="field"><button type="button" id="lookupSpec" class="small-primary" hidden>Load exchange specification</button></div>
+            </div>
+            <p id="lookupStatus" class="micro-note" role="status" hidden></p>
             <div id="specSource" class="spec-source">—</div>
+            <a id="contractReference" class="link-button" target="_blank" rel="noopener noreferrer" hidden>Contract specification source</a>
           </details>
         </div>
 
@@ -101,6 +109,7 @@
             <div class="ticket-line"><span>Take-profit price</span><b id="targetPrice">—</b></div>
             <div class="ticket-line"><span id="widthLabel">Stop width</span><b id="stopWidth">—</b></div>
             <div class="ticket-line" id="scenarioPriceRow" hidden><span>Adverse scenario price</span><b id="scenarioPrice">—</b></div>
+            <div class="ticket-line"><span>Estimated round-trip costs</span><b id="estimatedCosts">—</b></div>
             <div class="ticket-line"><span>Unused risk budget</span><b id="allocationUsed">—</b></div>
             <div class="ticket-line"><span>Estimated exposure <small>USD</small></span><b id="notional">—</b></div>
             <div class="ticket-line"><span>Extra-slip stress loss</span><b id="stressRisk">—</b></div>

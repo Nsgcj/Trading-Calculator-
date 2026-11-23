@@ -1,3 +1,4 @@
+import {supportsContractLookup,fetchContractSpec} from './contract-specs.mjs';
 import {getCurrentPrice,supportsCurrentPrice} from './quotes.mjs';
 import {MODES,DEFAULT_ACCOUNTS,DEFAULT_INSTRUMENTS,sizePosition,getHeadroom,getRiskBudget,usd,fmt} from './engine.mjs';
 const STORAGE_KEY='chicken-man-riskdesk-v1';
@@ -18,13 +19,20 @@ let state=(()=>{
    return {
     ...saved,
     accounts: addMissingPresets(saved.accounts, DEFAULT_ACCOUNTS),
-    instruments: addMissingPresets(saved.instruments, DEFAULT_INSTRUMENTS),
+    instruments: addMissingPresets(saved.instruments, DEFAULT_INSTRUMENTS).map(instrument=>{
+     if(instrument.sourceUrl || instrument.platform!=='futures') return instrument;
+     const official=DEFAULT_INSTRUMENTS.find(preset=>preset.id===instrument.id);
+     const originalSource=/^(CME(?:\/COMEX|\/NYMEX)? contract specification|Confirm tick and point value against the exchange and confirm prop firm order limits)$/;
+     const exchangeFields=['tickSize','pointValueQuote','quoteToUSD','quantityStep','minQuantity'];
+     if(!official?.sourceUrl || !originalSource.test(instrument.source) || !exchangeFields.every(key=>instrument[key]===official[key])) return instrument;
+     return {...instrument,source:official.source,sourceUrl:official.sourceUrl,verified:true};
+    }),
    };
   }
  } catch {}
  return { accounts:clone(DEFAULT_ACCOUNTS), instruments:clone(DEFAULT_INSTRUMENTS), accountId:'vest', instrumentId:'vest-nq', mode:'normal', modeFractions:{safe:.02,normal:.05,lottery:.60}, side:'long' };
 })();
-let currentResult=null,lastStopMode='price',quoteRequest,exampleEntry=true;
+let currentResult=null,lastStopMode='price',quoteRequest,specRequest,exampleEntry=true;
 function save(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));}catch{}}
 function selectedAccount(){return state.accounts.find(a=>a.id===state.accountId)||state.accounts[0];}
 function selectedInstrument(){return state.instruments.find(s=>s.id===state.instrumentId)??{};}
@@ -57,6 +65,7 @@ function fillInstruments(restoreAccountChoice=false){
  $('instrumentSelect').value=state.instrumentId;
 }
 function syncAccountFields(){
+ $('costsConfirmed').checked=false;
  const a=selectedAccount();
  for(const k of ['equity','floor','reserve','dailyRemaining','maxQuantity'])$(k).value=a[k]??'';
  $('accountVerified').checked=Boolean(a.verified);
@@ -67,14 +76,16 @@ function syncAccountFields(){
  $('accountNote').textContent = notes[a.platform] ?? 'Enter your current equity, loss floor and any venue or account limits. Keep these values up to date.';
 }
 function syncSpecFields(){
+ $('costsConfirmed').checked=false;
  const s=selectedInstrument();
  quoteRequest?.abort();
  updateQuoteControl();
  exampleEntry=true;
- const pairs={tickSize:s.tickSize,pointValue:s.pointValueQuote,conversion:s.quoteToUSD,pipSize:s.pipSize,qtyStep:s.quantityStep,minQty:s.minQuantity};
- for(const [id,v] of Object.entries(pairs))$(id).value=v??'';
- $('specVerified').checked=Boolean(s.verified);
- $('specSource').textContent=`${s.source||'Custom broker specification'} · Native order size: ${s.unit} · ${s.symbol}. Price feed is NOT live.`;
+ specRequest?.abort();
+ $('lookupSpec').disabled=false;
+ $('lookupSpec').hidden=!supportsContractLookup(s);
+ $('lookupStatus').hidden=true;
+ renderSpec(s);
  const refPrice={NQ:25000,ES:6000,GC:4000,CL:80,RTY:2200,YM:42000,SI:35,NG:3,EURUSD:1.1,USDJPY:150,GBPUSD:1.3,AUDUSD:0.65,USDCAD:1.4,EURJPY:165,BTC:90000,ETH:3000,SOL:150,STOCK:100,OTHER:100};
  const price=refPrice[s.reference];
  $('entry').value=$('useStop').checked?(price??''):'';
@@ -84,6 +95,46 @@ function syncSpecFields(){
  $('plannedQuantity').value='';
  $('plannedQuantityUnit').textContent=s.unit;
  lastStopMode='price';setStopLabel();
+}
+const specificationSources={
+ 'hyperliquid':'https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/tick-and-lot-size',
+ 'bybit-linear':'https://bybit-exchange.github.io/docs/v5/market/instrument',
+ 'binance-linear':'https://developers.binance.com/docs/derivatives/usds-margined-futures/market-data/rest-api/Exchange-Information',
+};
+function renderSpec(s){
+ const pairs={tickSize:s.tickSize,pointValue:s.pointValueQuote,conversion:s.quoteToUSD,pipSize:s.pipSize,qtyStep:s.quantityStep,minQty:s.minQuantity,minNotional:s.minNotionalQuote};
+ for(const [id,v] of Object.entries(pairs))$(id).value=v??'';
+ const isCurrent=!s.lookupAt || Date.now()-s.lookupAt<86400000;
+ $('specVerified').checked=Boolean(s.verified && isCurrent && s.platform!=='hyperliquid');
+ $('specVerified').disabled=s.platform==='hyperliquid' || Boolean(s.lookupAt);
+ $('specSource').textContent=`${s.source||'Custom broker specification'} · Native order size: ${s.unit} · ${s.symbol}. Price input is independent.`;
+ const reference=$('contractReference');
+ const url=s.sourceUrl??specificationSources[s.platform];
+ reference.hidden=!url;
+ if(url) reference.href=url;
+}
+async function lookupSpec(){
+ const instrument=selectedInstrument();
+ specRequest?.abort();
+ const request=new AbortController();
+ specRequest=request;
+ $('lookupSpec').disabled=true;
+ const status=$('lookupStatus');
+ status.hidden=false;
+ status.textContent='Loading published order rules…';
+ try {
+  const rules=await fetchContractSpec(instrument,{signal:request.signal});
+  if(request.signal.aborted) return;
+  Object.assign(instrument,rules,{lookupAt:Date.now(),verified:true,pointValueQuote:1});
+  $('costsConfirmed').checked=false;
+  renderSpec(instrument);
+  status.textContent='Published rules loaded. Enter the quote-to-USD rate and your execution costs.';
+  save();refresh();
+ } catch {
+  if(!request.signal.aborted) status.textContent='Exchange rules unavailable. Existing values are unchanged.';
+ } finally {
+  if(specRequest===request) $('lookupSpec').disabled=false;
+ }
 }
 function setStopLabel(){
  const mode=$('stopMode').value;
@@ -143,7 +194,7 @@ function setMode(mode){
  save();refresh();
 }
 function params(fraction=state.modeFractions[state.mode]){
- return {account:selectedAccount(),instrument:selectedInstrument(),side:state.side,entry:inputNumber('entry'),stopMode:$('useStop').checked?$('stopMode').value:'none',assumedMovePercent:inputNumber('assumedMove'),stopInput:inputNumber('stopInput'),plannedQuantity:inputNumber('plannedQuantity'),targetMode:$('useTarget').checked?$('targetMode').value:'none',rr:inputNumber('rr'),slippageTicks:inputNumber('slippageTicks'),spreadTicks:inputNumber('spreadTicks'),feePerUnit:inputNumber('feePerUnit'),stressExtraTicks:inputNumber('stressTicks'),riskFraction:fraction};
+ return {account:selectedAccount(),instrument:selectedInstrument(),side:state.side,entry:inputNumber('entry'),stopMode:$('useStop').checked?$('stopMode').value:'none',assumedMovePercent:inputNumber('assumedMove'),stopInput:inputNumber('stopInput'),plannedQuantity:inputNumber('plannedQuantity'),targetMode:$('useTarget').checked?$('targetMode').value:'none',rr:inputNumber('rr'),slippageTicks:inputNumber('slippageTicks'),spreadTicks:inputNumber('spreadTicks'),feePerUnit:inputNumber('feePerUnit'),stressExtraTicks:inputNumber('stressTicks'),riskFraction:fraction,costsConfirmed:$('costsConfirmed').checked};
 }
 function renderSummary(r){
  const a=selectedAccount(),h=getHeadroom(a);
@@ -160,6 +211,7 @@ function renderTicket(r){
  $('statusChip').textContent=r?.status==='CALCULATED' && r.stopMode==='none'?'SCENARIO':r?.status??'PENDING';
  $('quantity').textContent=good?fmt(r.quantity,10):'NO TRADE';
  $('quantityUnit').textContent=s.unit??'';
+ $('estimatedCosts').textContent=good?usd(r.roundTripCosts):'—';
  $('allocationUsed').textContent=good?usd(Math.max(0,r.budget-r.risk)):'—';
  const noStop=!$('useStop').checked;
  const fixedSize=!noStop && $('stopMode').value==='budget';
@@ -179,7 +231,7 @@ function renderTicket(r){
  $('stopWidth').textContent=good?`${fmt(r.stopDistance,6)} pts · ${fmt(r.stopTicks,2)} ticks`:'—';
  $('stressRisk').textContent=good?'−'+usd(r.stressRisk):'—';
  $('statusMessage').className='status-message '+(r?.status==='BLOCKED'?'blocked':r?.status==='CALCULATED'?'verified':'');
- $('statusMessage').textContent=r?.status==='BLOCKED'?'BLOCKED — '+(r.errors[0]||'One or more hard risk checks failed.') :r?.status==='VERIFY'?'VERIFY BEFORE USE — numbers are illustrative; validate both the account rules and instrument specification.':noStop?'SCENARIO — size is based on the assumed adverse move and estimated costs. Losses can exceed this estimate.':'SIZED — values include entered execution costs. This is not broker permission to execute.';
+ $('statusMessage').textContent=r?.status==='BLOCKED'?'BLOCKED — '+(r.errors[0]||'One or more hard risk checks failed.') :r?.status==='VERIFY'?'VERIFY BEFORE USE — numbers are illustrative; check account rules, contract specifications and execution costs.':noStop?'SCENARIO — size is based on the assumed adverse move and estimated costs. Losses can exceed this estimate.':'SIZED — values include entered execution costs. This is not broker permission to execute.';
  $('warningList').replaceChildren(...(r?.warnings||[]).map(message=>{const el=document.createElement('div');el.className='warning-item';el.textContent=message;return el;}));
  if(r?.errors?.length>1)for(const message of r.errors.slice(1)){const el=document.createElement('div');el.className='warning-item';el.textContent=message;$('warningList').append(el);}
  $('copyBtn').disabled=r?.status!=='CALCULATED';
@@ -212,8 +264,23 @@ function refresh(){
  renderSummary(r);renderTicket(r);renderModes();renderUnits(r);
 }
 function updateAccount(){const a=selectedAccount();for(const k of ['equity','floor','reserve'])a[k]=inputNumber(k);for(const k of ['dailyRemaining','maxQuantity'])a[k]=optionalNumber(k);a.verified=$('accountVerified').checked;save();refresh();}
-function updateSpec(){
- const s=selectedInstrument();s.tickSize=inputNumber('tickSize');s.pointValueQuote=inputNumber('pointValue');s.quoteToUSD=inputNumber('conversion');s.pipSize=optionalNumber('pipSize');s.quantityStep=inputNumber('qtyStep');s.minQuantity=inputNumber('minQty');s.verified=false;$('specVerified').checked=false;s.source='User-edited contract specification — verify with your platform';$('specSource').textContent=`${s.source} · ${s.symbol}`;
+function updateSpec(event){
+ const s=selectedInstrument();
+ const fields={tickSize:'tickSize',pointValue:'pointValueQuote',conversion:'quoteToUSD',pipSize:'pipSize',qtyStep:'quantityStep',minQty:'minQuantity',minNotional:'minNotionalQuote'};
+ const field=event.target.id;
+ specRequest?.abort();
+ $('lookupSpec').disabled=false;
+ $('lookupStatus').hidden=true;
+ s[fields[field]]=optionalNumber(field);
+ $('costsConfirmed').checked=false;
+ if(field!=='conversion' || !s.lookupAt){
+  s.verified=false;
+  delete s.lookupAt;
+  s.source='User-edited contract specification';
+ }
+ $('specVerified').checked=Boolean(s.verified && (!s.lookupAt || Date.now()-s.lookupAt<86400000));
+ $('specVerified').disabled=s.platform==='hyperliquid' || Boolean(s.lookupAt);
+ $('specSource').textContent=`${s.source} · ${s.symbol}`;
  save();refresh();
 }
 function switchStopMode(){
@@ -257,8 +324,14 @@ function init(){
  });
  $('stopMode').addEventListener('change',switchStopMode);
  $('targetMode').addEventListener('change',updateTargetMode);
- for(const id of ['assumedMove','stopInput','plannedQuantity','rr','slippageTicks','spreadTicks','feePerUnit','stressTicks'])$(id).addEventListener('input',refresh);
- for(const id of ['tickSize','pointValue','conversion','pipSize','qtyStep','minQty'])$(id).addEventListener('input',updateSpec);
+ for(const id of ['assumedMove','stopInput','plannedQuantity','rr','stressTicks'])$(id).addEventListener('input',refresh);
+ for(const id of ['slippageTicks','spreadTicks','feePerUnit'])$(id).addEventListener('input',()=>{
+  $('costsConfirmed').checked=false;
+  refresh();
+ });
+ $('costsConfirmed').addEventListener('change',refresh);
+ for(const id of ['tickSize','pointValue','conversion','pipSize','qtyStep','minQty','minNotional'])$(id).addEventListener('input',updateSpec);
+ $('lookupSpec').addEventListener('click',lookupSpec);
  $('specVerified').addEventListener('change',()=>{selectedInstrument().verified=$('specVerified').checked;save();refresh();});
  $('addAccountBtn').addEventListener('click',()=>{$('newAccountPanel').hidden=!$('newAccountPanel').hidden;});
  $('saveAccountBtn').addEventListener('click',()=>{
