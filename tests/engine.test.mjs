@@ -161,3 +161,60 @@ test('missing account balances and failure floors block sizing', () => {
 test('rounds down quantities with scientific-notation increments', () => {
   assert.equal(roundQuantityDown(4.29e-7, 1e-8), 4.2e-7);
 });
+
+const assumedMove = {
+  ...base,
+  stopMode: 'none',
+  stopInput: undefined,
+  assumedMovePercent: 1,
+  riskFraction: MODES.lottery.fraction,
+};
+
+test('with both exits off, sizes from an outward-rounded adverse move without returning exit levels', () => {
+  const entry = 25010.12;
+  for (const [side, modeledDistance] of [['long', 250.12], ['short', 250.13]]) {
+    const result = sizePosition({ ...assumedMove, entry, side, targetMode: 'none', rr: undefined });
+    assert.notEqual(result.status, 'BLOCKED');
+    assert.equal(result.quantity, 0.02);
+    assert.ok(Math.abs(result.risk - result.quantity * modeledDistance) < 1e-9);
+    assert.ok(result.stop == null);
+    assert.ok(result.target == null);
+    assert.ok(result.expectedReward == null);
+  }
+});
+
+test('budget take profit can be calculated independently with the stop off', () => {
+  const result = sizePosition({ ...assumedMove, targetMode: 'budget', rr: 2 });
+  assert.notEqual(result.status, 'BLOCKED');
+  assert.ok(result.stop == null);
+  assert.equal(result.quantity, 0.02);
+  assert.equal(result.target, 25600);
+  assert.equal(result.expectedReward, 12);
+});
+
+test('take profit can be turned off while retaining a manual stop', () => {
+  const result = sizePosition({
+    ...base,
+    targetMode: 'none',
+    rr: undefined,
+    riskFraction: MODES.lottery.fraction,
+  });
+  assert.equal(result.status, 'CALCULATED');
+  assert.equal(result.stop, base.stopInput);
+  assert.equal(result.quantity, 0.2);
+  assert.ok(result.target == null);
+  assert.ok(result.expectedReward == null);
+});
+
+test('invalid adverse move assumptions block sizing without a stop', () => {
+  for (const assumedMovePercent of [undefined, 0, -1, Infinity]) {
+    const result = sizePosition({
+      ...assumedMove,
+      assumedMovePercent,
+      targetMode: 'none',
+      rr: undefined,
+    });
+    assert.equal(result.status, 'BLOCKED');
+    assert.ok(result.quantity == null);
+  }
+});

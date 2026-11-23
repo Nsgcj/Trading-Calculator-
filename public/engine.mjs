@@ -163,6 +163,8 @@ export function sizePosition(p) {
   const entry=numeric(p.entry), requested=numeric(p.stopInput), rr=numeric(p.rr);
   const budgetStop=p.stopMode==='budget', budgetTarget=p.targetMode==='budget';
   const plannedQuantity=numeric(p.plannedQuantity);
+  const noStop=p.stopMode==='none', noTarget=p.targetMode==='none';
+  const assumedMovePercent=numeric(p.assumedMovePercent);
   const tick=numeric(s.tickSize), pointQuote=numeric(s.pointValueQuote), fx=numeric(s.quoteToUSD), step=numeric(s.quantityStep), minQ=numeric(s.minQuantity);
   const slip=numeric(p.slippageTicks ?? 0), spread=numeric(p.spreadTicks ?? 0), fees=numeric(p.feePerUnit ?? 0), stressExtra=numeric(p.stressExtraTicks ?? 2);
   if (!h) errors.push('Enter valid account equity, failure floor and safety reserve.');
@@ -171,15 +173,16 @@ export function sizePosition(p) {
   if (budget === null) errors.push('Risk fraction or daily-loss allowance is invalid.');
   else if (budget <= 0) errors.push('Risk allowance is zero. No trade.');
   if (!finitePositive(entry)) errors.push('Entry price must be positive.');
-  if (!budgetStop && !finitePositive(requested)) errors.push('Stop must be a positive number.');
+  if (!noStop && !budgetStop && !finitePositive(requested)) errors.push('Stop must be a positive number.');
+  if (noStop && (!finitePositive(assumedMovePercent) || assumedMovePercent>=100)) errors.push('Enter an assumed adverse move greater than 0% and below 100%.');
   if (budgetStop && !finitePositive(plannedQuantity)) errors.push('Enter your planned position quantity in native units.');
   if (!finitePositive(tick) || !finitePositive(pointQuote) || !finitePositive(fx)) errors.push('Instrument tick size, point value and quote→USD rate must all be positive.');
   if (!finitePositive(step) || !finitePositive(minQ) || minQ < step - nearly) errors.push('Instrument quantity step/minimum are invalid.');
-  if (!finitePositive(rr)) errors.push('Reward multiple must be positive.');
+  if (!noTarget && !finitePositive(rr)) errors.push('Reward multiple must be positive.');
   if (![slip,spread,fees,stressExtra].every(finiteNonnegative)) errors.push('Trading costs and stress ticks cannot be negative.');
   if (!['long','short'].includes(p.side)) errors.push('Choose long or short.');
-  if (!['price','points','ticks','pips','budget'].includes(p.stopMode)) errors.push('Invalid stop unit.');
-  if (p.targetMode!==undefined && !['stop','budget'].includes(p.targetMode)) errors.push('Invalid take-profit method.');
+  if (!['price','points','ticks','pips','budget','none'].includes(p.stopMode)) errors.push('Invalid stop unit.');
+  if (p.targetMode!==undefined && !['stop','budget','none'].includes(p.targetMode)) errors.push('Invalid take-profit method.');
   if (p.stopMode==='pips' && !finitePositive(numeric(s.pipSize))) errors.push('Pips require a verified pip size in the instrument settings.');
   const maxQ=(a.maxQuantity===null||a.maxQuantity===''||a.maxQuantity===undefined)?null:numeric(a.maxQuantity);
   if (maxQ!==null && !finiteNonnegative(maxQ)) errors.push('Max account quantity cannot be negative.');
@@ -207,6 +210,9 @@ export function sizePosition(p) {
       return blocked('The risk budget cannot fit an adverse price tick at this quantity.');
     }
     warnings.push('Budget stop is a modeled loss limit. Check the price against market structure and venue liquidation rules.');
+  } else if (noStop) {
+    stopRaw=entry+direction*entry*(assumedMovePercent/100);
+    warnings.push('Sizing scenario only. Without a stop, actual losses can exceed the modeled loss and account limits.');
   } else if (p.stopMode==='price') stopRaw=requested;
   else {
     const distance = requested * (p.stopMode==='ticks'?tick:p.stopMode==='pips'?numeric(s.pipSize):1);
@@ -227,11 +233,11 @@ export function sizePosition(p) {
   if (budgetStop && (!finitePositive(risk) || risk-budget>budget*1e-10)) return blocked('The generated stop exceeds the risk budget at this quantity.');
   const targetDistance=budgetTarget?(budget*rr/qty+costsPerUnit)/pointUSD:distance*rr;
   const targetDirection=budgetTarget?-direction:direction;
-  const target=tickRound(entry-direction*targetDistance,tick,targetDirection>0?'up':'down');
-  if (!finitePositive(target) || (budgetTarget && !(direction*(entry-target)>0))) return blocked('Target price is outside the valid price range; adjust the target multiple.');
-  const grossTarget=Math.abs(target-entry)*pointUSD*qty;
+  const target=noTarget?undefined:tickRound(entry-direction*targetDistance,tick,targetDirection>0?'up':'down');
+  if (!noTarget && (!finitePositive(target) || (budgetTarget && !(direction*(entry-target)>0)))) return blocked('Target price is outside the valid price range; adjust the target multiple.');
+  const grossTarget=noTarget?undefined:Math.abs(target-entry)*pointUSD*qty;
   const roundTripCosts=qty*costsPerUnit;
-  const reward=grossTarget-roundTripCosts;
+  const reward=noTarget?undefined:grossTarget-roundTripCosts;
   const stressRisk=risk+qty*stressExtra*tick*pointUSD;
   if (!a.verified) warnings.push('Account floor and drawdown rules are not confirmed. Enter the live broker floor before trading.');
   if (!s.verified) warnings.push('Instrument unit/lot/contract specification NOT verified. Confirm the platform specification.');
@@ -242,13 +248,13 @@ export function sizePosition(p) {
   const verified=Boolean(a.verified && s.verified);
   return {
     status:verified?'CALCULATED':'VERIFY',warnings,errors,headroom:h,budget,
-    quantity:qty,risk,expectedReward:reward,rrNet:reward/risk,
+    quantity:qty,risk,expectedReward:reward,rrNet:noTarget?undefined:reward/risk,
     maxLossFraction: risk/h.raw, reservePostStop: h.raw-risk,
-    postStopEquity: numeric(a.equity)-risk, postTargetEquity:numeric(a.equity)+reward,
-    stop,target,stopDistance:distance,stopTicks:distance/tick,
+    postStopEquity: numeric(a.equity)-risk, postTargetEquity:noTarget?undefined:numeric(a.equity)+reward,
+    stop:noStop?undefined:stop,target,scenarioPrice:noStop?stop:undefined,notionalUSD:entry*pointUSD*qty,stopDistance:distance,stopTicks:distance/tick,
     perUnitLoss:lossPerUnit,pointValueUSD:pointUSD,tickValueUSD:pointUSD*tick,
     grossTarget,roundTripCosts,stressRisk,stressPostEquity:numeric(a.equity)-stressRisk,
-    riskFraction, originalStop:stopRaw,entry,stopMode:p.stopMode,targetMode:p.targetMode??'stop'
+    riskFraction, originalStop:noStop?undefined:stopRaw,entry,stopMode:p.stopMode,targetMode:p.targetMode??'stop'
   };
 }
 

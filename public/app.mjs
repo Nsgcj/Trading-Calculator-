@@ -1,3 +1,4 @@
+import {getCurrentPrice,supportsCurrentPrice} from './quotes.mjs';
 import {MODES,DEFAULT_ACCOUNTS,DEFAULT_INSTRUMENTS,sizePosition,getHeadroom,getRiskBudget,usd,fmt} from './engine.mjs';
 const STORAGE_KEY='chicken-man-riskdesk-v1';
 const $=id=>document.getElementById(id);
@@ -23,7 +24,7 @@ let state=(()=>{
  } catch {}
  return { accounts:clone(DEFAULT_ACCOUNTS), instruments:clone(DEFAULT_INSTRUMENTS), accountId:'vest', instrumentId:'vest-nq', mode:'normal', modeFractions:{safe:.02,normal:.05,lottery:.60}, side:'long' };
 })();
-let currentResult=null,lastStopMode='price';
+let currentResult=null,lastStopMode='price',quoteRequest,exampleEntry=true;
 function save(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));}catch{}}
 function selectedAccount(){return state.accounts.find(a=>a.id===state.accountId)||state.accounts[0];}
 function selectedInstrument(){return state.instruments.find(s=>s.id===state.instrumentId)||state.instruments[0];}
@@ -51,13 +52,16 @@ function syncAccountFields(){
 }
 function syncSpecFields(){
  const s=selectedInstrument();
+ quoteRequest?.abort();
+ updateQuoteControl();
+ exampleEntry=true;
  const pairs={tickSize:s.tickSize,pointValue:s.pointValueQuote,conversion:s.quoteToUSD,pipSize:s.pipSize,qtyStep:s.quantityStep,minQty:s.minQuantity};
  for(const [id,v] of Object.entries(pairs))$(id).value=v??'';
  $('specVerified').checked=Boolean(s.verified);
  $('specSource').textContent=`${s.source||'Custom broker specification'} · Native order size: ${s.unit} · ${s.symbol}. Price feed is NOT live.`;
  const refPrice={NQ:25000,ES:6000,GC:4000,CL:80,RTY:2200,YM:42000,SI:35,NG:3,EURUSD:1.1,USDJPY:150,GBPUSD:1.3,AUDUSD:0.65,USDCAD:1.4,EURJPY:165,BTC:90000,ETH:3000,SOL:150,STOCK:100,OTHER:100};
  const price=refPrice[s.reference]??100;
- $('entry').value=price;
+ $('entry').value=$('useStop').checked?price:'';
  const dist={NQ:30,ES:10,GC:10,CL:1,RTY:5,YM:50,SI:0.1,NG:0.05,EURUSD:0.002,USDJPY:0.2,GBPUSD:0.002,AUDUSD:0.002,USDCAD:0.002,EURJPY:0.2,BTC:500,ETH:25,SOL:2,STOCK:2,OTHER:2}[s.reference]??2;
  $('stopInput').value=Number((price+(state.side==='short'?dist:-dist)).toPrecision(11));
  if ($('stopMode').value!=='budget') $('stopMode').value='price';
@@ -68,17 +72,49 @@ function syncSpecFields(){
 function setStopLabel(){
  const mode=$('stopMode').value;
  $('stopLabel').textContent=({price:'Structural stop price',points:'Stop distance (price points)',ticks:'Stop distance (ticks)',pips:'Stop distance (pips)'})[mode]??'Structural stop price';
- const budgetStop=mode==='budget';
- $('manualStopField').hidden=budgetStop;
+ const includeStop=$('useStop').checked;
+ const budgetStop=includeStop && mode==='budget';
+ $('stopModeField').hidden=!includeStop;
+ $('assumedMoveField').hidden=includeStop;
+ $('scenarioHelp').hidden=includeStop;
+ $('manualStopField').hidden=!includeStop || budgetStop;
  $('plannedQuantityField').hidden=!budgetStop;
  $('budgetStopNote').hidden=!budgetStop;
- $('manualStopNote').hidden=budgetStop;
+ $('manualStopNote').hidden=!includeStop || budgetStop;
 }
 function updateTargetMode(){
- const budgetTarget=$('targetMode').value==='budget';
- $('rrLabel').textContent=budgetTarget?'Target risk-budget multiple':'Target stop-distance multiple';
+ const includeTarget=$('useTarget').checked;
+ const budgetTarget=includeTarget && $('targetMode').value==='budget';
+ $('targetModeField').hidden=!includeTarget;
+ $('rrField').hidden=!includeTarget;
+ $('rrLabel').textContent=budgetTarget?'Target risk-budget multiple':$('useStop').checked?'Target stop-distance multiple':'Target assumed-move multiple';
  $('budgetTargetNote').hidden=!budgetTarget;
  refresh();
+}
+function updateQuoteControl(){
+ const supported=supportsCurrentPrice(selectedInstrument());
+ $('currentPrice').hidden=!supported;
+ $('currentPrice').disabled=false;
+ $('quoteStatus').textContent=supported?'Enter a price or fetch a quote snapshot.':'Enter your current broker price. Quote lookup is unavailable for this instrument.';
+}
+async function fetchEntry(){
+ quoteRequest?.abort();
+ const request=new AbortController();
+ quoteRequest=request;
+ $('currentPrice').disabled=true;
+ $('quoteStatus').textContent='Fetching a quote…';
+ try {
+  const {price,source}=await getCurrentPrice(selectedInstrument(),{signal:request.signal});
+  if (request.signal.aborted) return;
+  $('entry').value=price;
+  exampleEntry=false;
+  $('quoteStatus').textContent=source+' snapshot · '+new Date().toLocaleTimeString();
+  refresh();
+ } catch {
+  if (!request.signal.aborted) $('quoteStatus').textContent='Quote unavailable. Enter the current price from your broker.';
+ } finally {
+  if (quoteRequest===request) $('currentPrice').disabled=false;
+ }
 }
 function setMode(mode){
  state.mode=mode;
@@ -91,7 +127,7 @@ function setMode(mode){
  save();refresh();
 }
 function params(fraction=state.modeFractions[state.mode]){
- return {account:selectedAccount(),instrument:selectedInstrument(),side:state.side,entry:inputNumber('entry'),stopMode:$('stopMode').value,stopInput:inputNumber('stopInput'),plannedQuantity:inputNumber('plannedQuantity'),targetMode:$('targetMode').value,rr:inputNumber('rr'),slippageTicks:inputNumber('slippageTicks'),spreadTicks:inputNumber('spreadTicks'),feePerUnit:inputNumber('feePerUnit'),stressExtraTicks:inputNumber('stressTicks'),riskFraction:fraction};
+ return {account:selectedAccount(),instrument:selectedInstrument(),side:state.side,entry:inputNumber('entry'),stopMode:$('useStop').checked?$('stopMode').value:'none',assumedMovePercent:inputNumber('assumedMove'),stopInput:inputNumber('stopInput'),plannedQuantity:inputNumber('plannedQuantity'),targetMode:$('useTarget').checked?$('targetMode').value:'none',rr:inputNumber('rr'),slippageTicks:inputNumber('slippageTicks'),spreadTicks:inputNumber('spreadTicks'),feePerUnit:inputNumber('feePerUnit'),stressExtraTicks:inputNumber('stressTicks'),riskFraction:fraction};
 }
 function renderSummary(r){
  const a=selectedAccount(),h=getHeadroom(a);
@@ -104,21 +140,28 @@ function renderSummary(r){
 function renderTicket(r){
  const good=r&&r.status!=='BLOCKED'&&Number.isFinite(r.quantity),s=selectedInstrument();
  $('statusChip').className='state-chip '+(r?.status==='CALCULATED'?'calculated':r?.status==='BLOCKED'?'blocked':'');
- $('statusChip').textContent=r?.status??'PENDING';
+ $('statusChip').textContent=r?.status==='CALCULATED' && r.stopMode==='none'?'SCENARIO':r?.status??'PENDING';
  $('quantity').textContent=good?fmt(r.quantity,10):'NO TRADE';
  $('quantityUnit').textContent=s.unit;
- const fixedSize=$('stopMode').value==='budget';
+ const noStop=!$('useStop').checked;
+ const fixedSize=!noStop && $('stopMode').value==='budget';
+ $('bufferLabel').textContent=noStop?'MODELED BUFFER':'POST-STOP BUFFER';
+ $('lossLabel').textContent=noStop?'Modeled adverse loss':'Planned stop loss';
+ $('widthLabel').textContent=noStop?'Assumed move, tick-adjusted':'Stop width';
+ $('scenarioPriceRow').hidden=!noStop;
+ $('scenarioPrice').textContent=good?fmt(r.scenarioPrice,10):'—';
+ $('notional').textContent=good?usd(r.notionalUSD):'—';
  $('quantityCaption').textContent=fixedSize?'PLANNED SIZE · NATIVE PLATFORM UNITS':'MAX POSITION SIZE · NATIVE PLATFORM UNITS';
  $('quantityHint').textContent=good?`${s.symbol} · ${state.side.toUpperCase()} · ${fixedSize?'fixed planned quantity':'estimated maximum native quantity'}`:'Risk budget, platform minimum or setup validation prevents sizing.';
  $('actualRisk').textContent=good?'−'+usd(r.risk):'—';
  $('targetProfit').textContent=good?usd(r.expectedReward):'—';
- $('effectiveRR').textContent=good?`1 : ${fmt(r.rrNet,2)}`:'—';
+ $('effectiveRR').textContent=good&&Number.isFinite(r.rrNet)?`1 : ${fmt(r.rrNet,2)}`:'—';
  $('stopPrice').textContent=good?fmt(r.stop,10):'—';
  $('targetPrice').textContent=good?fmt(r.target,10):'—';
  $('stopWidth').textContent=good?`${fmt(r.stopDistance,6)} pts · ${fmt(r.stopTicks,2)} ticks`:'—';
  $('stressRisk').textContent=good?'−'+usd(r.stressRisk):'—';
  $('statusMessage').className='status-message '+(r?.status==='BLOCKED'?'blocked':r?.status==='CALCULATED'?'verified':'');
- $('statusMessage').textContent=r?.status==='BLOCKED'?'BLOCKED — '+(r.errors[0]||'One or more hard risk checks failed.') :r?.status==='VERIFY'?'VERIFY BEFORE USE — numbers are illustrative; validate both the account rules and instrument specification.':'SIZED — values include entered execution costs. This is not broker permission to execute.';
+ $('statusMessage').textContent=r?.status==='BLOCKED'?'BLOCKED — '+(r.errors[0]||'One or more hard risk checks failed.') :r?.status==='VERIFY'?'VERIFY BEFORE USE — numbers are illustrative; validate both the account rules and instrument specification.':noStop?'SCENARIO — size is based on the assumed adverse move and estimated costs. Losses can exceed this estimate.':'SIZED — values include entered execution costs. This is not broker permission to execute.';
  $('warningList').replaceChildren(...(r?.warnings||[]).map(message=>{const el=document.createElement('div');el.className='warning-item';el.textContent=message;return el;}));
  if(r?.errors?.length>1)for(const message of r.errors.slice(1)){const el=document.createElement('div');el.className='warning-item';el.textContent=message;$('warningList').append(el);}
  $('copyBtn').disabled=r?.status!=='CALCULATED';
@@ -128,7 +171,7 @@ function renderModes(){
  for(const mode of Object.keys(MODES)){
   const fraction=state.modeFractions[mode],r=sizePosition(params(fraction));
   const tr=document.createElement('tr');if(mode===state.mode)tr.className='row-highlight';
-  tr.innerHTML=`<td>${escapeHTML(MODES[mode].label)}</td><td>${escapeHTML(usd(r.budget))}</td><td>${escapeHTML(fmt(r.quantity,10))}</td><td>${escapeHTML(r.risk===undefined?'—':'−'+usd(r.risk))}</td><td>${escapeHTML(fmt(r.stop,10))}</td><td>${escapeHTML(fmt(r.target,10))}</td><td class="${r.status==='BLOCKED'?'bad-text':'good-text'}">${escapeHTML(r.status==='BLOCKED'?'NO SIZE':r.status==='VERIFY'?'VERIFY':'SIZED')}</td>`;
+  tr.innerHTML=`<td>${escapeHTML(MODES[mode].label)}</td><td>${escapeHTML(usd(r.budget))}</td><td>${escapeHTML(fmt(r.quantity,10))}</td><td>${escapeHTML(r.risk===undefined?'—':'−'+usd(r.risk))}</td><td>${escapeHTML(fmt(r.stop,10))}</td><td>${escapeHTML(fmt(r.target,10))}</td><td class="${r.status==='BLOCKED'?'bad-text':'good-text'}">${escapeHTML(r.status==='BLOCKED'?'NO SIZE':r.status==='VERIFY'?'VERIFY':r.stopMode==='none'?'SCENARIO':'SIZED')}</td>`;
   body.append(tr);
  }
 }
@@ -174,9 +217,22 @@ function init(){
  $('accountVerified').addEventListener('change',updateAccount);
  $('riskPercent').addEventListener('input',()=>{const v=inputNumber('riskPercent');state.modeFractions[state.mode]=v/100;for(const key of Object.keys(MODES))$(key+'Percent').textContent=pct(state.modeFractions[key]);save();refresh();});
  for(const side of ['long','short'])$(side+'Btn').addEventListener('click',()=>{state.side=side;for(const k of ['long','short']){$(k+'Btn').classList.toggle('active',side===k);$(k+'Btn').setAttribute('aria-pressed',String(side===k));}save();refresh();});
+ $('useStop').addEventListener('change',()=>{
+  if (!$('useStop').checked && exampleEntry) $('entry').value='';
+  setStopLabel();
+  updateTargetMode();
+ });
+ $('useTarget').addEventListener('change',updateTargetMode);
+ $('currentPrice').addEventListener('click',fetchEntry);
+ $('entry').addEventListener('input',()=>{
+  quoteRequest?.abort();
+  exampleEntry=false;
+  updateQuoteControl();
+  refresh();
+ });
  $('stopMode').addEventListener('change',switchStopMode);
  $('targetMode').addEventListener('change',updateTargetMode);
- for(const id of ['entry','stopInput','plannedQuantity','rr','slippageTicks','spreadTicks','feePerUnit','stressTicks'])$(id).addEventListener('input',refresh);
+ for(const id of ['assumedMove','stopInput','plannedQuantity','rr','slippageTicks','spreadTicks','feePerUnit','stressTicks'])$(id).addEventListener('input',refresh);
  for(const id of ['tickSize','pointValue','conversion','pipSize','qtyStep','minQty'])$(id).addEventListener('input',updateSpec);
  $('specVerified').addEventListener('change',()=>{selectedInstrument().verified=$('specVerified').checked;save();refresh();});
  $('addAccountBtn').addEventListener('click',()=>{$('newAccountPanel').hidden=!$('newAccountPanel').hidden;});
@@ -198,7 +254,7 @@ function init(){
  $('copyBtn').addEventListener('click',async()=>{
   const r=currentResult;if(!r||r.status!=='CALCULATED')return;
   const a=selectedAccount(),s=selectedInstrument();
-  const plan=`CHICKEN MAN — RISK DESK\nACCOUNT: ${a.name}\nINSTRUMENT: ${s.symbol}\nSIDE: ${state.side.toUpperCase()}\nMODE: ${MODES[state.mode].label} (${pct(state.modeFractions[state.mode])} of usable drawdown)\nEQUITY: ${usd(a.equity)} | FLOOR: ${usd(a.floor)} | RISK BUDGET: ${usd(r.budget)}\nENTRY: ${fmt(r.entry,10)}\nSTOP: ${fmt(r.stop,10)} (${r.stopMode==='budget'?'drawdown budget':'manual'}) | TARGET: ${fmt(r.target,10)} (${r.targetMode==='budget'?'drawdown budget':'stop distance'})\nORDER QUANTITY: ${fmt(r.quantity,10)} ${s.unit}\nMODELED STOP RISK: ${usd(r.risk)} | TARGET NET: ${usd(r.expectedReward)} | STRESS LOSS: ${usd(r.stressRisk)}\nRemaining floor buffer after stop: ${usd(r.reservePostStop)}\nExecution estimates included. Not broker authorization. Stops may slip. Live rules must be checked.`;
+  const plan=`CHICKEN MAN — RISK DESK\nACCOUNT: ${a.name}\nINSTRUMENT: ${s.symbol}\nSIDE: ${state.side.toUpperCase()}\nMODE: ${MODES[state.mode].label} (${pct(state.modeFractions[state.mode])} of usable drawdown)\nEQUITY: ${usd(a.equity)} | FLOOR: ${usd(a.floor)} | RISK BUDGET: ${usd(r.budget)}\nENTRY: ${fmt(r.entry,10)}\nSTOP: ${fmt(r.stop,10)} (${r.stopMode==='none'?'disabled':r.stopMode==='budget'?'drawdown budget':'manual'}) | TARGET: ${fmt(r.target,10)} (${r.targetMode==='none'?'disabled':r.targetMode==='budget'?'drawdown budget':r.stopMode==='none'?'assumed move':'stop distance'})\nORDER QUANTITY: ${fmt(r.quantity,10)} ${s.unit}\nMODELED LOSS: ${usd(r.risk)} | TARGET NET: ${usd(r.expectedReward)} | STRESS LOSS: ${usd(r.stressRisk)}\nModeled remaining floor buffer: ${usd(r.reservePostStop)}\n${r.stopMode==='none'?'Assumed adverse scenario: '+fmt(r.scenarioPrice,10)+'. Actual loss can exceed the modeled loss. ':''}Execution estimates included. Not broker authorization. Stops may slip. Live rules must be checked.`;
   try{await navigator.clipboard.writeText(plan);$('copyBtn').textContent='Copied ✓';setTimeout(()=>{$('copyBtn').innerHTML='Copy position plan <span>↗</span>';},1800);}catch{const old=$('copyBtn').textContent;$('copyBtn').textContent='Clipboard unavailable — use HTTPS';setTimeout(()=>{$('copyBtn').textContent=old;},1800);}
  });
  $('resetBtn').addEventListener('click',()=>{if(!window.confirm('Reset saved accounts and instrument settings to examples?'))return;localStorage.removeItem(STORAGE_KEY);window.location.reload();});

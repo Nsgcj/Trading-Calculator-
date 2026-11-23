@@ -46,6 +46,12 @@ Conservative slippage stress is shown separately. Models may miss gaps, stop rej
 - Under **Take-profit method**, choose **From drawdown budget** to target the selected budget times your chosen multiple in modeled net profit. A $25 budget at 2× targets at least $50 net after estimated costs. This works with a structural stop or a budget-based stop. **From stop distance** keeps the original price-distance calculation.
 - The comparison table shows stop and target prices for each mode. A budget-based price is a modeled loss or profit level. Check market structure and the venue's liquidation rules separately.
 
+### Sizing with optional exits
+
+- Toggle **Include stop-loss** and **Include take-profit** independently. With the stop off, enter an entry price and review the editable adverse-move assumption (1% by default). The desk sizes the scenario from your current account, risk mode, and entered costs. The scenario price and estimated exposure appear on the position ticket. Losses can exceed the scenario estimate without a stop.
+- **Use current price** fetches a snapshot for built-in BTC, ETH and SOL Coinbase USD spot or Hyperliquid perpetual instruments. For other markets, enter the current broker price manually. A quote snapshot does not update automatically.
+- With take-profit off, the ticket omits the target and reward figures. If take-profit is enabled with the stop off, a distance-based target uses the assumed adverse move.
+
 ### Instrument presets
 
 - **Account profiles:** Topstep, Apex Trader Funding, Take Profit Trader, TradeDay, Earn2Trade, and FTMO join the existing MFF and Vest examples. New profiles require your current equity, failure floor, and any applicable limits. Firm rules are entered manually.
