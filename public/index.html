@@ -17,7 +17,7 @@
 
     <main>
       <div class="hero">
-        <div><div class="eyebrow"><span class="teal-point"></span> RISK FIRST. SIZE SECOND.</div><h1>Trade the setup.<br/><em>Not the account.</em></h1><p>A professional sizing desk for different platforms, contracts and risk appetites. Enter your actual invalidation level; the desk translates it into tradable quantity.</p></div>
+        <div><div class="eyebrow"><span class="teal-point"></span> RISK FIRST. SIZE SECOND.</div><h1>Trade the setup.<br/><em>Not the account.</em></h1><p>A professional sizing desk for different platforms, contracts and risk appetites. Enter a structural stop to size a trade, or enter a planned quantity to calculate a stop from your drawdown budget.</p></div>
         <div class="hero-guide"><span>01 / THE OPERATING RULE</span><p>Define the structural stop → calculate your permitted loss → round quantity <b>down</b> to the platform's unit step.</p><small>If the minimum order is too large, the correct position is <b>NO TRADE</b>.</small></div>
       </div>
 
@@ -43,7 +43,7 @@
           <div class="panel-title"><div><div class="section-kicker">01 / CAPITAL</div><h2>Account rules</h2></div><span class="panel-mark">◈</span></div>
           <label for="accountSelect">Account profile</label><select id="accountSelect"></select>
           <div class="inline-action"><button type="button" id="addAccountBtn" class="link-button">+ Create an account profile</button></div>
-          <div id="newAccountPanel" class="new-panel" hidden><label for="newAccountName">New account name</label><input id="newAccountName" placeholder="e.g. MFF account 2" maxlength="70"/><label for="newAccountPlatform" style="margin-top:10px">Contract platform</label><select id="newAccountPlatform"><option value="futures">Futures (MFF / CME)</option><option value="vest">Vest Perpetuals</option><option value="custom">Forex, Crypto, Stocks / Custom</option></select><button id="saveAccountBtn" class="small-primary" type="button">Create profile</button></div>
+          <div id="newAccountPanel" class="new-panel" hidden><label for="newAccountName">New account name</label><input id="newAccountName" placeholder="e.g. MFF account 2" maxlength="70"/><label for="newAccountPlatform" style="margin-top:10px">Contract platform</label><select id="newAccountPlatform"><option value="futures">Futures (CME / prop firms)</option><option value="vest">Vest Perpetuals</option><option value="hyperliquid">Hyperliquid Perpetuals</option><option value="binance-linear">Binance USDⓈ-M Perpetuals</option><option value="bybit-linear">Bybit USDT Perpetuals</option><option value="custom">Forex, Crypto Spot, Stocks / Custom</option></select><button id="saveAccountBtn" class="small-primary" type="button">Create profile</button></div>
           <div class="field-row"><div class="field"><label for="equity">Current equity <span>USD</span></label><input type="number" id="equity" step="any" min="0" inputmode="decimal" /></div><div class="field"><label for="floor">Current failure floor <span>USD</span></label><input type="number" id="floor" step="any" min="0" inputmode="decimal" /></div></div>
           <div class="field-row"><div class="field"><label for="reserve">Extra safety reserve <span>USD</span></label><input type="number" id="reserve" step="any" min="0" inputmode="decimal" /></div><div class="field"><label for="dailyRemaining">Daily risk remaining <span>USD</span></label><input type="number" id="dailyRemaining" step="any" min="0" inputmode="decimal" placeholder="Not set" /></div></div>
           <div class="field-row"><div class="field"><label for="maxQuantity">Account max quantity</label><input type="number" id="maxQuantity" step="any" min="0" inputmode="decimal" placeholder="Not set"/></div><div class="field"><label for="riskPercent">Risk fraction <span>% of usable room</span></label><input type="number" id="riskPercent" step="0.5" min="0.01" max="100" inputmode="decimal"/></div></div>
@@ -58,9 +58,18 @@
           <div class="inline-action"><button type="button" id="addInstrumentBtn" class="link-button">+ Duplicate & customize instrument</button></div>
           <div id="newInstrumentPanel" class="new-panel" hidden><div class="field-row"><div class="field"><label for="newInstrumentSymbol">Symbol</label><input id="newInstrumentSymbol" placeholder="e.g. XAUUSD" maxlength="24" /></div><div class="field"><label for="newInstrumentName">Description</label><input id="newInstrumentName" placeholder="Gold CFD" maxlength="80" /></div></div><button type="button" id="saveInstrumentBtn" class="small-primary">Create custom instrument</button></div>
           <div class="direction-toggle" role="group" aria-label="Trade direction"><button type="button" id="longBtn" class="active" aria-pressed="true">↑ Long</button><button type="button" id="shortBtn" aria-pressed="false">↓ Short</button></div>
-          <div class="field-row"><div class="field"><label for="entry">Entry price</label><input type="number" id="entry" value="25000" step="any" inputmode="decimal" /></div><div class="field"><label for="stopMode">Stop expressed as</label><select id="stopMode"><option value="price">Actual stop price</option><option value="points">Points / price movement</option><option value="ticks">Ticks</option><option value="pips">Pips (FX only)</option></select></div></div>
-          <div class="field-row"><div class="field"><label for="stopInput" id="stopLabel">Structural stop price</label><input type="number" id="stopInput" value="24970" step="any" inputmode="decimal" /></div><div class="field"><label for="rr">Target R multiple</label><input type="number" id="rr" step="0.25" min="0.01" value="3" inputmode="decimal"/></div></div>
-          <p class="micro-note">Set the stop at technical invalidation (e.g. beyond structure + appropriate volatility buffer), not at a convenient percentage of account size.</p>
+          <div class="field-row"><div class="field"><label for="entry">Entry price</label><input type="number" id="entry" value="25000" step="any" inputmode="decimal" /></div><div class="field"><label for="stopMode">Stop expressed as</label><select id="stopMode"><option value="price">Actual stop price</option><option value="points">Points / price movement</option><option value="ticks">Ticks</option><option value="pips">Pips (FX only)</option><option value="budget">From drawdown budget</option></select></div></div>
+          <div class="field-row">
+            <div class="field" id="manualStopField"><label for="stopInput" id="stopLabel">Structural stop price</label><input type="number" id="stopInput" value="24970" step="any" inputmode="decimal" /></div>
+            <div class="field" id="plannedQuantityField" hidden><label for="plannedQuantity">Planned quantity <span id="plannedQuantityUnit"></span></label><input type="number" id="plannedQuantity" min="0" step="any" inputmode="decimal" aria-describedby="budgetStopNote" /></div>
+            <div class="field"><label for="targetMode">Take-profit method</label><select id="targetMode"><option value="stop">From stop distance</option><option value="budget">From drawdown budget</option></select></div>
+          </div>
+          <p class="micro-note" id="manualStopNote">Enter the technical invalidation price or distance to calculate the maximum position size.</p>
+          <p class="micro-note" id="budgetStopNote" hidden>Enter the size you plan to trade. The calculated stop fits the selected loss budget after estimated costs and tick rounding.</p>
+          <div class="field-row">
+            <div class="field"><label for="rr" id="rrLabel">Target stop-distance multiple</label><input type="number" id="rr" step="any" min="0.01" value="3" inputmode="decimal"/></div>
+          </div>
+          <p class="micro-note" id="budgetTargetNote" hidden>The target aims for net profit equal to the selected loss budget times this multiple, accounting for estimated costs and tick size.</p>
           <details class="advanced" open><summary>Contract specification & execution costs <span>EDITABLE</span></summary>
             <div class="field-row"><div class="field"><label for="tickSize">Minimum price tick</label><input id="tickSize" type="number" step="any" min="0" /></div><div class="field"><label for="pointValue">Cash per 1.0 price move <span>quote ccy / unit</span></label><input id="pointValue" type="number" step="any" min="0" /></div></div>
             <div class="field-row"><div class="field"><label for="conversion">Quote currency → USD rate</label><input id="conversion" type="number" step="any" min="0" /></div><div class="field"><label for="pipSize">Pip size <span>FX only</span></label><input id="pipSize" type="number" step="any" min="0" placeholder="N/A" /></div></div>
@@ -74,14 +83,15 @@
         <div class="panel right-panel">
           <div class="panel-title"><div><div class="section-kicker">03 / THE DECISION</div><h2>Position ticket</h2></div><span class="state-chip" id="statusChip">PENDING</span></div>
           <div class="ticket">
-            <div class="ticket-eyebrow">MAX POSITION SIZE · NATIVE PLATFORM UNITS</div>
+            <div class="ticket-eyebrow" id="quantityCaption">MAX POSITION SIZE · NATIVE PLATFORM UNITS</div>
             <div class="ticket-big"><strong id="quantity">—</strong><span id="quantityUnit">units</span></div>
             <p id="quantityHint">Set your account, instrument and stop.</p>
             <div class="ticket-divider"></div>
             <div class="ticket-line"><span>Planned stop loss</span><b class="red" id="actualRisk">—</b></div>
             <div class="ticket-line"><span>Target net profit <small>(model)</small></span><b class="teal" id="targetProfit">—</b></div>
             <div class="ticket-line"><span>Effective net R : R</span><b id="effectiveRR">—</b></div>
-            <div class="ticket-line"><span>Stop / TP price</span><b id="levels">—</b></div>
+            <div class="ticket-line"><span>Stop-loss price</span><b id="stopPrice">—</b></div>
+            <div class="ticket-line"><span>Take-profit price</span><b id="targetPrice">—</b></div>
             <div class="ticket-line"><span>Stop width</span><b id="stopWidth">—</b></div>
             <div class="ticket-line"><span>Extra-slip stress loss</span><b id="stressRisk">—</b></div>
           </div>
@@ -93,7 +103,7 @@
 
       <section class="bottom-grid">
         <div class="panel secondary-panel"><div class="panel-title"><div><div class="section-kicker">04 / COMPARATIVE RISK</div><h2>Same setup, three modes</h2></div></div>
-          <div class="table-wrap"><table><thead><tr><th>MODE</th><th>RISK CAP</th><th>NATIVE SIZE</th><th>ACTUAL LOSS</th><th>STATUS</th></tr></thead><tbody id="modeTable"></tbody></table></div>
+          <div class="table-wrap"><table><thead><tr><th>MODE</th><th>RISK CAP</th><th>NATIVE SIZE</th><th>MODELED LOSS</th><th>STOP LOSS</th><th>TAKE PROFIT</th><th>STATUS</th></tr></thead><tbody id="modeTable"></tbody></table></div>
           <p class="fine">A preset may show NO TRADE when the exchange's minimum contract is too large. That is intentional.</p>
         </div>
         <div class="panel secondary-panel"><div class="panel-title"><div><div class="section-kicker">05 / UNIT TRANSLATOR</div><h2>Speak every platform</h2></div></div>
