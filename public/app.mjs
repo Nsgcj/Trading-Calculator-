@@ -56,6 +56,7 @@ function fillAccounts(){
  $('accountSelect').value=state.accountId;
 }
 const platformNames={
+ vest:'Vest',futures:'Futures',custom:'Personal / FX',hyperliquid:'Hyperliquid',
  vest:'Vest','perp-custom':'Custom Perpetuals',futures:'Futures',custom:'Personal / FX',hyperliquid:'Hyperliquid',
  'binance-linear':'Binance USDⓈ-M','bybit-linear':'Bybit USDT',
 };
