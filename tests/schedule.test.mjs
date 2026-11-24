@@ -131,3 +131,21 @@ test('overseas calendars account for documented closures, half days and coverage
   assert.equal(find(later.active, 'hkex-am').regularOnly, true);
   assert.equal(find(later.active, 'tse-am').regularOnly, false);
 });
+
+test('previous session is determined by its closing time during an overlap', () => {
+  const overlap = at('2026-11-24T14:45:00Z', 'fx');
+  assert.deepEqual(ids(overlap.active), ['london', 'new-york']);
+  assert.deepEqual(ids(overlap.previous), ['tokyo']);
+  assert.equal(overlap.previous[0].end.toISOString(), '2026-11-24T09:00:00.000Z');
+
+  const globexBreak = at('2026-11-24T22:00:00Z', 'futures');
+  assert.deepEqual(ids(globexBreak.previous), ['cme-equity', 'cme-metals', 'cme-energy']);
+  assert.ok(globexBreak.previous.every(session => session.end.toISOString() === '2026-11-24T22:00:00.000Z'));
+});
+
+test('previous sessions look through holiday weekends and exclude continuous crypto', () => {
+  const holidayWeekend = at('2026-12-27T22:00:00Z', 'futures');
+  assert.deepEqual(ids(holidayWeekend.previous), ['cme-metals', 'cme-energy']);
+  assert.equal(holidayWeekend.previous[0].end.toISOString(), '2026-12-24T18:45:00.000Z');
+  assert.deepEqual(at('2026-12-27T22:00:00Z', 'crypto').previous, []);
+});

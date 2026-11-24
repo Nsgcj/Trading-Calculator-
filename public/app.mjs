@@ -125,7 +125,7 @@ function syncAccountFields(){
  $('createFundedBtn').hidden=!next;
  if(next) $('createFundedBtn').textContent=`+ Create ${ACCOUNT_STAGES[next]} profile`;
  const notes = {
-  vest: 'Verify Vest contract multipliers and account floor. The $500/$490 profile is an illustration.',
+  vest: 'Enter your live Vest equity and failure floor. The $500/$490 profile is an illustration.',
   futures: 'Enter the current failure floor, daily loss allowance and position limits for your prop firm program.',
  };
  $('accountNote').textContent = a.stage==='sim-funded' || a.stage==='live-funded'
@@ -140,7 +140,7 @@ function syncSpecFields(){
  cancelQuote();
  entryQuote=null;
  updateQuoteControl();
- specRequest?.abort();
+ cancelSpecLookup();
  $('lookupSpec').disabled=false;
  $('lookupSpec').hidden=!supportsContractLookup(s);
  $('lookupStatus').hidden=true;
@@ -152,8 +152,11 @@ function syncSpecFields(){
  $('plannedQuantityUnit').textContent=s.unit;
  lastStopMode='price';setStopLabel();
  maybeFetchEntry();
+ const needsRules=!s.lookupAt || Date.now()-s.lookupAt>=86400000;
+ if(supportsContractLookup(s) && needsRules && s.source!=='User-edited contract specification') void lookupSpec();
 }
 const specificationSources={
+ 'vest':'https://docs.vestmarkets.com/trading/markets',
  'hyperliquid':'https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/tick-and-lot-size',
  'bybit-linear':'https://bybit-exchange.github.io/docs/v5/market/instrument',
  'binance-linear':'https://developers.binance.com/docs/derivatives/usds-margined-futures/market-data/rest-api/Exchange-Information',
@@ -171,26 +174,35 @@ function renderSpec(s){
  reference.hidden=!url;
  if(url) reference.href=url;
 }
+function cancelSpecLookup(){
+ specRequest?.abort();
+ specRequest=null;
+}
 async function lookupSpec(){
  const instrument=selectedInstrument();
- specRequest?.abort();
+ cancelSpecLookup();
  const request=new AbortController();
  specRequest=request;
  $('lookupSpec').disabled=true;
  const status=$('lookupStatus');
  status.hidden=false;
  status.textContent='Loading published order rules…';
+ refresh();
  try {
   const rules=await fetchContractSpec(instrument,{signal:request.signal});
   if(request.signal.aborted) return;
-  Object.assign(instrument,rules,{lookupAt:Date.now(),verified:true,pointValueQuote:1});
+  Object.assign(instrument,rules,{lookupAt:Date.now(),verified:true});
   renderSpec(instrument);
   status.textContent='Published rules loaded. Quote conversion and costs are separate estimates.';
-  save();refresh();
+  save();
  } catch {
-  if(!request.signal.aborted) status.textContent='Exchange rules unavailable. Existing values are unchanged.';
+  if(!request.signal.aborted) status.textContent='Broker lookup unavailable. The desk is using existing specs.';
  } finally {
-  if(specRequest===request) $('lookupSpec').disabled=false;
+  if(specRequest===request){
+   specRequest=null;
+   $('lookupSpec').disabled=false;
+   refresh();
+  }
  }
 }
 function setStopLabel(){
@@ -285,7 +297,7 @@ function exitInputs(){
  });
 }
 function params(fraction=state.modeFractions[state.mode]){
- return {account:selectedAccount(),instrument:selectedInstrument(),side:state.side,entry:quoteRequest?NaN:inputNumber('entry'),...exitInputs(),slippageTicks:inputNumber('slippageTicks'),spreadTicks:inputNumber('spreadTicks'),feePerUnit:inputNumber('feePerUnit'),stressExtraTicks:inputNumber('stressTicks'),riskFraction:fraction};
+ return {account:selectedAccount(),instrument:selectedInstrument(),side:state.side,entry:quoteRequest||specRequest?NaN:inputNumber('entry'),...exitInputs(),slippageTicks:inputNumber('slippageTicks'),spreadTicks:inputNumber('spreadTicks'),feePerUnit:inputNumber('feePerUnit'),stressExtraTicks:inputNumber('stressTicks'),riskFraction:fraction};
 }
 function renderSummary(r){
  const a=selectedAccount(),h=getHeadroom(a);
@@ -317,9 +329,15 @@ async function copyExitPrice(field,label){
 }
 function renderTicket(r){
  const good=r&&r.status!=='BLOCKED'&&Number.isFinite(r.quantity),s=selectedInstrument();
- $('statusChip').className='state-chip '+(r?.status==='CALCULATED'?'calculated':r?.status==='BLOCKED'?'blocked':'');
- $('statusChip').textContent=quoteRequest?'QUOTING':r?.status??'PENDING';
- $('quantity').textContent=good?fmt(r.quantity,10):'NO TRADE';
+ const pending=Boolean(specRequest||quoteRequest);
+ const tickSource=s.lookupAt?(Date.now()-s.lookupAt<86400000?'Broker':'Last broker lookup'):s.sourceUrl?'Exchange':'Profile';
+ $('appliedTickSize').textContent=specRequest?'Loading…':Number(s.tickSize)>0?`${formatExitPrice(s.tickSize)} · ${tickSource}`:'—';
+ const hasMinimum=Number.isFinite(r.minimumUnitRisk);
+ $('minimumTradeRiskRow').hidden=!hasMinimum;
+ $('minimumTradeRisk').textContent=hasMinimum?`${usd(r.minimumUnitRisk)} / ${usd(r.budget)} budget`:'—';
+ $('statusChip').className='state-chip '+(pending?'':r?.status==='CALCULATED'?'calculated':r?.status==='BLOCKED'?'blocked':'');
+ $('statusChip').textContent=specRequest?'LOADING SPECS':quoteRequest?'QUOTING':r?.status??'PENDING';
+ $('quantity').textContent=pending?'—':good?fmt(r.quantity,10):'NO TRADE';
  $('quantityUnit').textContent=s.unit??'';
  $('estimatedCosts').textContent=good?usd(r.roundTripCosts):'—';
  $('allocationUsed').textContent=good?usd(Math.max(0,r.budget-r.risk)):'—';
@@ -335,12 +353,12 @@ function renderTicket(r){
  $('effectiveRR').textContent=good&&Number.isFinite(r.rrNet)?`1 : ${fmt(r.rrNet,2)}`:'—';
  renderExitPrice('stopPrice','copyStopPrice',r.stop);
  renderExitPrice('targetPrice','copyTargetPrice',r.target);
- $('stopWidth').textContent=good?`${fmt(r.stopDistance,6)} pts · ${fmt(r.stopTicks,2)} ticks`:'—';
+ $('stopWidth').textContent=Number.isFinite(r.stopDistance)?`${fmt(r.stopDistance,6)} pts · ${fmt(r.stopTicks,2)} ticks`:'—';
  $('stressRisk').textContent=good?'−'+usd(r.stressRisk):'—';
- $('statusMessage').className='status-message '+(r?.status==='BLOCKED'?'blocked':r?.status==='CALCULATED'?'verified':'');
- $('statusMessage').textContent=quoteRequest?'Fetching public price before sizing…':r?.status==='BLOCKED'?'BLOCKED — '+(r.errors[0]||'One or more hard risk checks failed.') :r?.status==='VERIFY'?'VERIFY BEFORE USE — numbers are illustrative; check the account rules and any unverified contract assumptions.':'SIZED — values include entered execution costs. This is not broker permission to execute.';
+ $('statusMessage').className='status-message '+(pending?'':r?.status==='BLOCKED'?'blocked':r?.status==='CALCULATED'?'verified':'');
+ $('statusMessage').textContent=specRequest?'Loading published tick size and order rules…':quoteRequest?'Fetching public price before sizing…':r?.status==='BLOCKED'?'BLOCKED — '+(r.errors[0]||'One or more hard risk checks failed.') :r?.status==='VERIFY'?'VERIFY BEFORE USE — numbers are illustrative; check the account rules and any unverified contract assumptions.':'SIZED — values include entered execution costs. This is not broker permission to execute.';
  $('warningList').replaceChildren(...(r?.warnings||[]).map(message=>{const el=document.createElement('div');el.className='warning-item';el.textContent=message;return el;}));
- if(r?.errors?.length>1)for(const message of r.errors.slice(1)){const el=document.createElement('div');el.className='warning-item';el.textContent=message;$('warningList').append(el);}
+ if(!pending && r?.errors?.length>1)for(const message of r.errors.slice(1)){const el=document.createElement('div');el.className='warning-item';el.textContent=message;$('warningList').append(el);}
  $('copyBtn').disabled=r?.status!=='CALCULATED';
 }
 function renderModes(){
@@ -401,11 +419,14 @@ function updateSpec(event){
  const s=selectedInstrument();
  const fields={tickSize:'tickSize',pointValue:'pointValueQuote',conversion:'quoteToUSD',pipSize:'pipSize',qtyStep:'quantityStep',minQty:'minQuantity',minNotional:'minNotionalQuote'};
  const field=event.target.id;
- specRequest?.abort();
- $('lookupSpec').disabled=false;
- $('lookupStatus').hidden=true;
+ const conversionOnly=field==='conversion';
+ if(!conversionOnly) {
+  cancelSpecLookup();
+  $('lookupSpec').disabled=false;
+  $('lookupStatus').hidden=true;
+ }
  s[fields[field]]=optionalNumber(field);
- if(field!=='conversion' || !s.lookupAt){
+ if(!conversionOnly){
   s.verified=false;
   delete s.lookupAt;
   delete s.sourceUrl;

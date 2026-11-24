@@ -89,6 +89,7 @@
           <p class="micro-note" id="feeSchedule"></p>
           <a class="link-button" id="feeSource" target="_blank" rel="noopener noreferrer" hidden>Published trading fees</a>
           <button type="button" class="link-button" id="applyPublishedFee" hidden></button>
+          <p id="lookupStatus" class="micro-note" role="status" hidden></p>
           <details class="advanced"><summary>Contract specification & execution costs <span>OPTIONAL SETTINGS</span></summary>
             <div class="field-row"><div class="field"><label for="tickSize">Minimum price tick</label><input id="tickSize" type="number" step="any" min="0" /></div><div class="field"><label for="pointValue">Cash per 1.0 price move <span>quote ccy / unit</span></label><input id="pointValue" type="number" step="any" min="0" /></div></div>
             <div class="field-row"><div class="field"><label for="conversion">Quote currency → USD rate</label><input id="conversion" type="number" step="any" min="0" /></div><div class="field"><label for="pipSize">Pip size <span>FX only</span></label><input id="pipSize" type="number" step="any" min="0" placeholder="N/A" /></div></div>
@@ -100,7 +101,6 @@
               <div class="field"><label for="minNotional">Minimum order value <span>quote currency</span></label><input id="minNotional" type="number" step="any" min="0" placeholder="Not set" /></div>
               <div class="field"><button type="button" id="lookupSpec" class="small-primary" hidden>Load exchange specification</button></div>
             </div>
-            <p id="lookupStatus" class="micro-note" role="status" hidden></p>
             <div id="specSource" class="spec-source">—</div>
             <a id="contractReference" class="link-button" target="_blank" rel="noopener noreferrer" hidden>Contract specification source</a>
           </details>
@@ -118,6 +118,8 @@
             <div class="ticket-line"><span>Effective net R : R</span><b id="effectiveRR">—</b></div>
             <div class="ticket-line"><span id="stopPriceLabel">Stop-loss price</span><span class="level-actions"><b id="stopPrice">—</b><button type="button" id="copyStopPrice" class="level-copy" aria-label="Copy stop-loss price" disabled>Copy SL</button></span></div>
             <div class="ticket-line"><span id="targetPriceLabel">Take-profit price</span><span class="level-actions"><b id="targetPrice">—</b><button type="button" id="copyTargetPrice" class="level-copy" aria-label="Copy take-profit price" disabled>Copy TP</button></span></div>
+            <div class="ticket-line"><span>Applied tick size</span><b id="appliedTickSize">—</b></div>
+            <div class="ticket-line" id="minimumTradeRiskRow" hidden><span>Minimum position risk</span><b id="minimumTradeRisk">—</b></div>
             <div class="ticket-line"><span id="widthLabel">Stop width</span><b id="stopWidth">—</b></div>
             <div class="ticket-line"><span>Estimated round-trip costs</span><b id="estimatedCosts">—</b></div>
             <div class="ticket-line"><span>Unused risk budget</span><b id="allocationUsed">—</b></div>

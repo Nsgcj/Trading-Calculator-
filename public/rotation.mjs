@@ -191,7 +191,7 @@ function occurrence(definition, day, usSession) {
 function rotation(now, definitions) {
   const today = Math.floor(easternMinutes(now) / DAY) * DAY;
   const windows = [];
-  for (let offset = -3; offset <= 7; offset++) {
+  for (let offset = -7; offset <= 7; offset++) {
     const day = today + offset * DAY;
     const weekday = new Date(day).getUTCDay();
     const us = weekdays.includes(weekday) ? getUsSession(day) : null;
@@ -201,6 +201,8 @@ function rotation(now, definitions) {
     }
   }
   windows.sort((a, b) => a.start - b.start);
+  const previous = windows.reduce((latest, window) =>
+    window.end <= now && (!latest || window.end >= latest.end) ? window : latest, null);
   const upcoming = windows.filter(window => window.start > now);
   const next = upcoming[0] ?? null;
   const nextDay = upcoming.filter(window => window.start - now <= DAY);
@@ -209,17 +211,16 @@ function rotation(now, definitions) {
   if (active) {
     const phase = active.steps?.find(step => step.start <= now && now < step.end);
     const current = phase ? { ...active, phase, status: phase.status } : active;
-    return { current, next, timeline };
+    return { current, next, previous, timeline };
   }
 
-  const previousEnd = windows.findLast(window => window.end <= now)?.end;
   const current = {
     id: 'off-window', name: 'Outside planned execution windows', status: 'off', assets: [],
-    start: previousEnd ?? easternInstant(today, '00:00'),
+    start: previous?.end ?? easternInstant(today, '00:00'),
     end: next?.start ?? easternInstant(today + DAY, '00:00'),
     description: 'Review your plan or prepare for the next window.',
   };
-  return { current, next, timeline };
+  return { current, next, previous, timeline };
 }
 
 export function getRotation(now = new Date()) {
