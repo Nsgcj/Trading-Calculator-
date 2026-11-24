@@ -1,7 +1,7 @@
 import {accountReferences} from './account-references.mjs';
 import {supportsContractLookup,fetchContractSpec} from './contract-specs.mjs';
 import {getCurrentPrice,supportsCurrentPrice} from './quotes.mjs';
-import {ACCOUNT_STAGES,MODES,DEFAULT_ACCOUNTS,DEFAULT_INSTRUMENTS,sizePosition,getHeadroom,getRiskBudget,usd,fmt} from './engine.mjs';
+import {ACCOUNT_STAGES,MODES,DEFAULT_ACCOUNTS,DEFAULT_INSTRUMENTS,sizePosition,resolveExitInputs,getHeadroom,getRiskBudget,usd,fmt} from './engine.mjs';
 const STORAGE_KEY='chicken-man-riskdesk-v1';
 const $=id=>document.getElementById(id);
 const clone=o=>structuredClone(o);
@@ -36,7 +36,7 @@ let state=(()=>{
  } catch {}
  return { accounts:clone(DEFAULT_ACCOUNTS), instruments:clone(DEFAULT_INSTRUMENTS), accountId:'vest', instrumentId:'vest-nq', mode:'normal', modeFractions:{safe:.02,normal:.05,lottery:.60}, side:'long' };
 })();
-let currentResult=null,lastStopMode='price',quoteRequest,specRequest,exampleEntry=true;
+let currentResult=null,lastStopMode='price',quoteRequest,specRequest,quoteAt=0,exampleEntry=true,exampleStop=true;
 function save(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));}catch{}}
 function selectedAccount(){return state.accounts.find(a=>a.id===state.accountId)||state.accounts[0];}
 function selectedInstrument(){return state.instruments.find(s=>s.id===state.instrumentId)??{};}
@@ -114,7 +114,8 @@ function syncAccountCommission(){
 }
 function syncAccountFields(){
  const a=selectedAccount();
- for(const k of ['equity','floor','reserve','dailyRemaining','maxQuantity'])$(k).value=a[k]??'';
+ for(const k of ['equity','floor','reserve','maxQuantity'])$(k).value=a[k]??'';
+ renderDailyRemaining();
  $('accountVerified').checked=Boolean(a.verified);
  $('noDailyLimit').checked=Boolean(a.noDailyLimit);
  $('dailyRemaining').disabled=Boolean(a.noDailyLimit);
@@ -137,7 +138,8 @@ function syncAccountFields(){
 function syncSpecFields(){
  syncAccountCommission();
  const s=selectedInstrument();
- quoteRequest?.abort();
+ cancelQuote();
+ quoteAt=0;
  updateQuoteControl();
  exampleEntry=true;
  specRequest?.abort();
@@ -147,13 +149,16 @@ function syncSpecFields(){
  renderSpec(s);
  const refPrice={NQ:25000,ES:6000,GC:4000,CL:80,RTY:2200,YM:42000,SI:35,NG:3,EURUSD:1.1,USDJPY:150,GBPUSD:1.3,AUDUSD:0.65,USDCAD:1.4,EURJPY:165,BTC:90000,ETH:3000,SOL:150,STOCK:100,OTHER:100};
  const price=refPrice[s.reference];
- $('entry').value=$('useStop').checked?(price??''):'';
+ const useDemo=!supportsCurrentPrice(s) && $('useStop').checked && $('useTarget').checked && price!==undefined;
+ $('entry').value=useDemo?price:'';
+ exampleStop=useDemo;
  const dist={NQ:30,ES:10,GC:10,CL:1,RTY:5,YM:50,SI:0.1,NG:0.05,EURUSD:0.002,USDJPY:0.2,GBPUSD:0.002,AUDUSD:0.002,USDCAD:0.002,EURJPY:0.2,BTC:500,ETH:25,SOL:2,STOCK:2,OTHER:2}[s.reference]??2;
- $('stopInput').value=price===undefined?'':Number((price+(state.side==='short'?dist:-dist)).toPrecision(11));
+ $('stopInput').value=!useDemo?'':Number((price+(state.side==='short'?dist:-dist)).toPrecision(11));
  if ($('stopMode').value!=='budget') $('stopMode').value='price';
  $('plannedQuantity').value='';
  $('plannedQuantityUnit').textContent=s.unit;
  lastStopMode='price';setStopLabel();
+ maybeFetchEntry();
 }
 const specificationSources={
  'hyperliquid':'https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/tick-and-lot-size',
@@ -200,9 +205,10 @@ function setStopLabel(){
  $('stopLabel').textContent=({price:'Structural stop price',points:'Stop distance (price points)',ticks:'Stop distance (ticks)',pips:'Stop distance (pips)'})[mode]??'Structural stop price';
  const includeStop=$('useStop').checked;
  const budgetStop=includeStop && mode==='budget';
+ const automaticStop=exitInputs().stopMode==='auto';
  $('stopModeField').hidden=!includeStop;
- $('assumedMoveField').hidden=includeStop;
- $('scenarioHelp').hidden=includeStop;
+ $('assumedMoveField').hidden=!automaticStop;
+ $('scenarioHelp').hidden=!automaticStop;
  $('manualStopField').hidden=!includeStop || budgetStop;
  $('plannedQuantityField').hidden=!budgetStop;
  $('budgetStopNote').hidden=!budgetStop;
@@ -210,12 +216,13 @@ function setStopLabel(){
 }
 function updateTargetMode(){
  const includeTarget=$('useTarget').checked;
- const budgetTarget=includeTarget && $('targetMode').value==='budget';
+ const automaticTarget=exitInputs().targetMode==='auto';
+ const budgetTarget=exitInputs().targetMode==='budget';
+ $('autoTargetNote').hidden=!automaticTarget;
  $('targetModeField').hidden=!includeTarget;
  $('rrField').hidden=!includeTarget;
- $('rrLabel').textContent=budgetTarget?'Target risk-budget multiple':$('useStop').checked?'Target stop-distance multiple':'Target assumed-move multiple';
+ $('rrLabel').textContent=budgetTarget?'Target risk-budget multiple':exitInputs().stopMode==='auto'?'Target automatic-stop multiple':'Target stop-distance multiple';
  $('budgetTargetNote').hidden=!budgetTarget;
- refresh();
 }
 function updateQuoteControl(){
  const supported=supportsCurrentPrice(selectedInstrument());
@@ -223,23 +230,45 @@ function updateQuoteControl(){
  $('currentPrice').disabled=false;
  $('quoteStatus').textContent=supported?'Enter a price or fetch a quote snapshot.':'Enter your current broker price. Quote lookup is unavailable for this instrument.';
 }
-async function fetchEntry(){
+function cancelQuote(){
  quoteRequest?.abort();
+ quoteRequest=null;
+}
+function maybeFetchEntry(){
+ const exits=exitInputs();
+ const auto=exits.stopMode==='auto' || exits.targetMode==='auto' || $('entry').value==='';
+ if(!auto) return;
+ if(exampleEntry) $('entry').value='';
+ if(exampleStop){
+  $('stopInput').value='';
+  exampleStop=false;
+ }
+ if(supportsCurrentPrice(selectedInstrument()) && !quoteRequest && Date.now()-quoteAt>30000) void fetchEntry();
+}
+async function fetchEntry(){
+ cancelQuote();
  const request=new AbortController();
  quoteRequest=request;
  $('currentPrice').disabled=true;
  $('quoteStatus').textContent='Fetching a quote…';
+ refresh();
  try {
-  const {price,source}=await getCurrentPrice(selectedInstrument(),{signal:request.signal});
+  const {price,source,time}=await getCurrentPrice(selectedInstrument(),{signal:request.signal});
   if (request.signal.aborted) return;
   $('entry').value=price;
+  if(exampleStop) $('stopInput').value='';
+  exampleStop=false;
   exampleEntry=false;
-  $('quoteStatus').textContent=source+' snapshot · '+new Date().toLocaleTimeString();
-  refresh();
+  quoteAt=Date.now();
+  $('quoteStatus').textContent=source+' snapshot · '+new Date(time??quoteAt).toLocaleTimeString();
  } catch {
-  if (!request.signal.aborted) $('quoteStatus').textContent='Quote unavailable. Enter the current price from your broker.';
+  if (!request.signal.aborted) $('quoteStatus').textContent=$('entry').value ? 'Quote unavailable. Levels use the entry shown.' : 'Quote unavailable. Enter the current price from your broker.';
  } finally {
-  if (quoteRequest===request) $('currentPrice').disabled=false;
+  if (quoteRequest===request){
+   quoteRequest=null;
+   $('currentPrice').disabled=false;
+   refresh();
+  }
  }
 }
 function setMode(mode){
@@ -252,8 +281,15 @@ function setMode(mode){
  for(const key of Object.keys(MODES))$(key+'Percent').textContent=pct(state.modeFractions[key]);
  save();refresh();
 }
+function exitInputs(){
+ return resolveExitInputs({
+  useStop:$('useStop').checked,useTarget:$('useTarget').checked,
+  stopMode:$('stopMode').value,stopInput:inputNumber('stopInput'),plannedQuantity:inputNumber('plannedQuantity'),
+  assumedMovePercent:inputNumber('assumedMove'),targetMode:$('targetMode').value,rr:inputNumber('rr'),
+ });
+}
 function params(fraction=state.modeFractions[state.mode]){
- return {account:selectedAccount(),instrument:selectedInstrument(),side:state.side,entry:inputNumber('entry'),stopMode:$('useStop').checked?$('stopMode').value:'none',assumedMovePercent:inputNumber('assumedMove'),stopInput:inputNumber('stopInput'),plannedQuantity:inputNumber('plannedQuantity'),targetMode:$('useTarget').checked?$('targetMode').value:'none',rr:inputNumber('rr'),slippageTicks:inputNumber('slippageTicks'),spreadTicks:inputNumber('spreadTicks'),feePerUnit:inputNumber('feePerUnit'),stressExtraTicks:inputNumber('stressTicks'),riskFraction:fraction};
+ return {account:selectedAccount(),instrument:selectedInstrument(),side:state.side,entry:quoteRequest?NaN:inputNumber('entry'),...exitInputs(),slippageTicks:inputNumber('slippageTicks'),spreadTicks:inputNumber('spreadTicks'),feePerUnit:inputNumber('feePerUnit'),stressExtraTicks:inputNumber('stressTicks'),riskFraction:fraction};
 }
 function renderSummary(r){
  const a=selectedAccount(),h=getHeadroom(a);
@@ -267,30 +303,27 @@ function renderSummary(r){
 function renderTicket(r){
  const good=r&&r.status!=='BLOCKED'&&Number.isFinite(r.quantity),s=selectedInstrument();
  $('statusChip').className='state-chip '+(r?.status==='CALCULATED'?'calculated':r?.status==='BLOCKED'?'blocked':'');
- $('statusChip').textContent=r?.status==='CALCULATED' && r.stopMode==='none'?'SCENARIO':r?.status??'PENDING';
+ $('statusChip').textContent=quoteRequest?'QUOTING':r?.status??'PENDING';
  $('quantity').textContent=good?fmt(r.quantity,10):'NO TRADE';
  $('quantityUnit').textContent=s.unit??'';
  $('estimatedCosts').textContent=good?usd(r.roundTripCosts):'—';
  $('allocationUsed').textContent=good?usd(Math.max(0,r.budget-r.risk)):'—';
- const noStop=!$('useStop').checked;
- const fixedSize=!noStop && $('stopMode').value==='budget';
- $('bufferLabel').textContent=noStop?'MODELED BUFFER':'POST-STOP BUFFER';
- $('lossLabel').textContent=noStop?'Modeled adverse loss':'Planned stop loss';
- $('widthLabel').textContent=noStop?'Assumed move, tick-adjusted':'Stop width';
- $('scenarioPriceRow').hidden=!noStop;
- $('scenarioPrice').textContent=good?fmt(r.scenarioPrice,10):'—';
+ const exits=exitInputs();
+ const fixedSize=exits.stopMode==='budget';
+ $('stopPriceLabel').textContent=exits.stopMode==='auto'?'Suggested stop-loss':'Stop-loss price';
+ $('targetPriceLabel').textContent=exits.targetMode==='auto'?'Suggested take-profit':'Take-profit price';
  $('notional').textContent=good?usd(r.notionalUSD):'—';
  $('quantityCaption').textContent=fixedSize?'PLANNED SIZE · NATIVE PLATFORM UNITS':'MAX POSITION SIZE · NATIVE PLATFORM UNITS';
  $('quantityHint').textContent=good?`${s.symbol} · ${state.side.toUpperCase()} · ${fixedSize?'fixed planned quantity':'estimated maximum native quantity'}`:'Risk budget, platform minimum or setup validation prevents sizing.';
  $('actualRisk').textContent=good?'−'+usd(r.risk):'—';
  $('targetProfit').textContent=good?usd(r.expectedReward):'—';
  $('effectiveRR').textContent=good&&Number.isFinite(r.rrNet)?`1 : ${fmt(r.rrNet,2)}`:'—';
- $('stopPrice').textContent=good?fmt(r.stop,10):'—';
- $('targetPrice').textContent=good?fmt(r.target,10):'—';
+ $('stopPrice').textContent=fmt(r.stop,10);
+ $('targetPrice').textContent=fmt(r.target,10);
  $('stopWidth').textContent=good?`${fmt(r.stopDistance,6)} pts · ${fmt(r.stopTicks,2)} ticks`:'—';
  $('stressRisk').textContent=good?'−'+usd(r.stressRisk):'—';
  $('statusMessage').className='status-message '+(r?.status==='BLOCKED'?'blocked':r?.status==='CALCULATED'?'verified':'');
- $('statusMessage').textContent=r?.status==='BLOCKED'?'BLOCKED — '+(r.errors[0]||'One or more hard risk checks failed.') :r?.status==='VERIFY'?'VERIFY BEFORE USE — numbers are illustrative; check the account rules and any unverified contract assumptions.':noStop?'SCENARIO — size is based on the assumed adverse move and estimated costs. Losses can exceed this estimate.':'SIZED — values include entered execution costs. This is not broker permission to execute.';
+ $('statusMessage').textContent=quoteRequest?'Fetching current price before sizing…':r?.status==='BLOCKED'?'BLOCKED — '+(r.errors[0]||'One or more hard risk checks failed.') :r?.status==='VERIFY'?'VERIFY BEFORE USE — numbers are illustrative; check the account rules and any unverified contract assumptions.':'SIZED — values include entered execution costs. This is not broker permission to execute.';
  $('warningList').replaceChildren(...(r?.warnings||[]).map(message=>{const el=document.createElement('div');el.className='warning-item';el.textContent=message;return el;}));
  if(r?.errors?.length>1)for(const message of r.errors.slice(1)){const el=document.createElement('div');el.className='warning-item';el.textContent=message;$('warningList').append(el);}
  $('copyBtn').disabled=r?.status!=='CALCULATED';
@@ -300,7 +333,7 @@ function renderModes(){
  for(const mode of Object.keys(MODES)){
   const fraction=state.modeFractions[mode],r=sizePosition(params(fraction));
   const tr=document.createElement('tr');if(mode===state.mode)tr.className='row-highlight';
-  tr.innerHTML=`<td>${escapeHTML(MODES[mode].label)}</td><td>${escapeHTML(usd(r.budget))}</td><td>${escapeHTML(fmt(r.quantity,10))}</td><td>${escapeHTML(r.risk===undefined?'—':'−'+usd(r.risk))}</td><td>${escapeHTML(fmt(r.stop,10))}</td><td>${escapeHTML(fmt(r.target,10))}</td><td class="${r.status==='BLOCKED'?'bad-text':'good-text'}">${escapeHTML(r.status==='BLOCKED'?'NO SIZE':r.status==='VERIFY'?'VERIFY':r.stopMode==='none'?'SCENARIO':'SIZED')}</td>`;
+  tr.innerHTML=`<td>${escapeHTML(MODES[mode].label)}</td><td>${escapeHTML(usd(r.budget))}</td><td>${escapeHTML(fmt(r.quantity,10))}</td><td>${escapeHTML(r.risk===undefined?'—':'−'+usd(r.risk))}</td><td>${escapeHTML(fmt(r.stop,10))}</td><td>${escapeHTML(fmt(r.target,10))}</td><td class="${r.status==='BLOCKED'?'bad-text':'good-text'}">${escapeHTML(r.status==='BLOCKED'?'NO SIZE':r.status==='VERIFY'?'VERIFY':'SIZED')}</td>`;
   body.append(tr);
  }
 }
@@ -318,11 +351,32 @@ function renderUnits(r){
  }
  $('unitBridge').replaceChildren(...items.map(([k,v])=>{const el=document.createElement('div');el.className='unit-item';const label=document.createElement('span');label.textContent=k;const strong=document.createElement('b');strong.textContent=v;el.append(label,strong);return el;}));
 }
+function renderDailyRemaining(){
+ const account=selectedAccount(),field=$('dailyRemaining');
+ const auto=account.noDailyLimit || account.dailyRemaining==null || account.dailyRemaining==='';
+ const available=getHeadroom(account)?.usable;
+ field.value=auto?(Number.isFinite(available)?available.toFixed(2):''):account.dailyRemaining;
+ $('dailyRemainingBasis').textContent=auto
+  ? (account.noDailyLimit ? 'Auto from equity minus floor and reserve.' : 'Auto from equity minus floor and reserve. Enter a separate daily allowance if one applies.')
+  : 'Using the entered daily allowance alongside the account drawdown limit. Clear to return to auto.';
+}
 function refresh(){
+ setStopLabel();updateTargetMode();
+ if(document.activeElement!==$('dailyRemaining')) renderDailyRemaining();
  const r=sizePosition(params());currentResult=r;
  renderSummary(r);renderTicket(r);renderModes();renderUnits(r);
 }
 function updateAccount(){const a=selectedAccount();for(const k of ['equity','floor','reserve'])a[k]=inputNumber(k);for(const k of ['dailyRemaining','maxQuantity'])a[k]=optionalNumber(k);a.verified=$('accountVerified').checked;a.noDailyLimit=$('noDailyLimit').checked;$('dailyRemaining').disabled=a.noDailyLimit;save();refresh();}
+function updateAccount(event){
+ const account=selectedAccount();
+ for(const key of ['equity','floor','reserve']) account[key]=inputNumber(key);
+ account.maxQuantity=optionalNumber('maxQuantity');
+ if(event.target.id==='dailyRemaining') account.dailyRemaining=optionalNumber('dailyRemaining');
+ account.verified=$('accountVerified').checked;
+ account.noDailyLimit=$('noDailyLimit').checked;
+ $('dailyRemaining').disabled=account.noDailyLimit;
+ save();refresh();
+}
 function updateCommission(){
  const account=selectedAccount(),instrument=selectedInstrument();
  account.commissions??={};
@@ -402,24 +456,38 @@ function init(){
  for(const k of ['equity','floor','reserve','dailyRemaining','maxQuantity'])$(k).addEventListener('input',updateAccount);
  $('accountVerified').addEventListener('change',updateAccount);
  $('noDailyLimit').addEventListener('change',updateAccount);
+ $('dailyRemaining').addEventListener('focus',()=>{
+  if(selectedAccount().dailyRemaining==null) $('dailyRemaining').select();
+ });
+ $('dailyRemaining').addEventListener('blur',renderDailyRemaining);
  $('riskPercent').addEventListener('input',()=>{const v=inputNumber('riskPercent');state.modeFractions[state.mode]=v/100;for(const key of Object.keys(MODES))$(key+'Percent').textContent=pct(state.modeFractions[key]);save();refresh();});
  for(const side of ['long','short'])$(side+'Btn').addEventListener('click',()=>{state.side=side;for(const k of ['long','short']){$(k+'Btn').classList.toggle('active',side===k);$(k+'Btn').setAttribute('aria-pressed',String(side===k));}save();refresh();});
- $('useStop').addEventListener('change',()=>{
-  if (!$('useStop').checked && exampleEntry) $('entry').value='';
-  setStopLabel();
-  updateTargetMode();
- });
- $('useTarget').addEventListener('change',updateTargetMode);
+ for(const id of ['useStop','useTarget','stopMode','targetMode']){
+  $(id).addEventListener('change',()=>{
+   if(id==='stopMode') switchStopMode();
+   maybeFetchEntry();refresh();
+  });
+ }
  $('currentPrice').addEventListener('click',fetchEntry);
  $('entry').addEventListener('input',()=>{
-  quoteRequest?.abort();
+  cancelQuote();quoteAt=0;
   exampleEntry=false;
-  updateQuoteControl();
+  if(exampleStop) $('stopInput').value='';
+  exampleStop=false;
+  updateQuoteControl();refresh();
+ });
+ $('entry').addEventListener('change',()=>{
+  if($('entry').value==='') maybeFetchEntry();
   refresh();
  });
  $('stopMode').addEventListener('change',switchStopMode);
  $('targetMode').addEventListener('change',updateTargetMode);
  for(const id of ['assumedMove','stopInput','plannedQuantity','rr','stressTicks'])$(id).addEventListener('input',refresh);
+ for(const id of ['stopInput','plannedQuantity','rr'])$(id).addEventListener('change',()=>{
+  maybeFetchEntry();refresh();
+ });
+ $('stopInput').addEventListener('input',()=>{exampleStop=false;refresh();});
+ for(const id of ['assumedMove','plannedQuantity','rr','stressTicks'])$(id).addEventListener('input',refresh);
  for(const id of ['slippageTicks','spreadTicks'])$(id).addEventListener('input',refresh);
  $('feePerUnit').addEventListener('input',updateCommission);
  $('applyPublishedFee').addEventListener('click',()=>{
@@ -457,12 +525,12 @@ function init(){
  $('copyBtn').addEventListener('click',async()=>{
   const r=currentResult;if(!r||r.status!=='CALCULATED')return;
   const a=selectedAccount(),s=selectedInstrument();
-  const plan=`CHICKEN MAN — RISK DESK\nACCOUNT: ${a.name}\nINSTRUMENT: ${s.symbol}\nSIDE: ${state.side.toUpperCase()}\nMODE: ${MODES[state.mode].label} (${pct(state.modeFractions[state.mode])} of usable drawdown)\nEQUITY: ${usd(a.equity)} | FLOOR: ${usd(a.floor)} | RISK BUDGET: ${usd(r.budget)}\nENTRY: ${fmt(r.entry,10)}\nSTOP: ${fmt(r.stop,10)} (${r.stopMode==='none'?'disabled':r.stopMode==='budget'?'drawdown budget':'manual'}) | TARGET: ${fmt(r.target,10)} (${r.targetMode==='none'?'disabled':r.targetMode==='budget'?'drawdown budget':r.stopMode==='none'?'assumed move':'stop distance'})\nORDER QUANTITY: ${fmt(r.quantity,10)} ${s.unit}\nMODELED LOSS: ${usd(r.risk)} | TARGET NET: ${usd(r.expectedReward)} | STRESS LOSS: ${usd(r.stressRisk)}\nModeled remaining floor buffer: ${usd(r.reservePostStop)}\n${r.stopMode==='none'?'Assumed adverse scenario: '+fmt(r.scenarioPrice,10)+'. Actual loss can exceed the modeled loss. ':''}Execution estimates included. Not broker authorization. Stops may slip. Live rules must be checked.`;
+  const plan=`CHICKEN MAN — RISK DESK\nACCOUNT: ${a.name}\nINSTRUMENT: ${s.symbol}\nSIDE: ${state.side.toUpperCase()}\nMODE: ${MODES[state.mode].label} (${pct(state.modeFractions[state.mode])} of usable drawdown)\nEQUITY: ${usd(a.equity)} | FLOOR: ${usd(a.floor)} | RISK BUDGET: ${usd(r.budget)}\nENTRY: ${fmt(r.entry,10)}\nSTOP: ${fmt(r.stop,10)} (${r.stopMode==='auto'?'suggested':r.stopMode==='budget'?'drawdown budget':'manual'}) | TARGET: ${fmt(r.target,10)} (${r.targetMode==='auto'?'suggested':r.targetMode==='budget'?'drawdown budget':'stop distance'})\nORDER QUANTITY: ${fmt(r.quantity,10)} ${s.unit}\nMODELED LOSS: ${usd(r.risk)} | TARGET NET: ${usd(r.expectedReward)} | STRESS LOSS: ${usd(r.stressRisk)}\nModeled remaining floor buffer: ${usd(r.reservePostStop)}\nExecution estimates included. Not broker authorization. Stops may slip. Live rules must be checked.`;
   try{await navigator.clipboard.writeText(plan);$('copyBtn').textContent='Copied ✓';setTimeout(()=>{$('copyBtn').innerHTML='Copy position plan <span>↗</span>';},1800);}catch{const old=$('copyBtn').textContent;$('copyBtn').textContent='Clipboard unavailable — use HTTPS';setTimeout(()=>{$('copyBtn').textContent=old;},1800);}
  });
  $('resetBtn').addEventListener('click',()=>{if(!window.confirm('Reset saved accounts and instrument settings to examples?'))return;localStorage.removeItem(STORAGE_KEY);window.location.reload();});
  // Direction state survives refresh; entry and price remain illustrative until manually edited.
  for(const key of ['long','short']){$(key+'Btn').classList.toggle('active',state.side===key);$(key+'Btn').setAttribute('aria-pressed',String(state.side===key));}
- updateTargetMode();
+ refresh();
 }
 init();

@@ -46,6 +46,7 @@
           <div id="newAccountPanel" class="new-panel" hidden><label for="newAccountName">New account name</label><input id="newAccountName" placeholder="e.g. MFF account 2" maxlength="70"/><label for="newAccountStage" style="margin-top:10px">Account stage</label><select id="newAccountStage"></select><label for="newAccountPlatform" style="margin-top:10px">Contract platform</label><select id="newAccountPlatform"><option value="futures">Futures (CME / prop firms)</option><option value="vest">Vest Perpetuals</option><option value="perp-custom">Custom Perpetuals</option><option value="hyperliquid">Hyperliquid Perpetuals</option><option value="binance-linear">Binance USDⓈ-M Perpetuals</option><option value="bybit-linear">Bybit USDT Perpetuals</option><option value="custom">Forex, Crypto Spot, Stocks / Custom</option></select><p class="micro-note">Each profile has its own balance, drawdown floor and limits.</p><button id="saveAccountBtn" class="small-primary" type="button">Create profile</button></div>
           <div class="field-row"><div class="field"><label for="equity">Current equity <span>USD</span></label><input type="number" id="equity" step="any" min="0" inputmode="decimal" /></div><div class="field"><label for="floor"><span id="accountFloorLabel">Current failure floor</span> <span>USD</span></label><input type="number" id="floor" step="any" min="0" inputmode="decimal" /></div></div>
           <div class="field-row"><div class="field"><label for="reserve">Extra safety reserve <span>USD</span></label><input type="number" id="reserve" step="any" min="0" inputmode="decimal" /></div><div class="field"><label for="dailyRemaining">Daily risk remaining <span>USD</span></label><input type="number" id="dailyRemaining" step="any" min="0" inputmode="decimal" placeholder="Not set" /></div></div>
+          <p class="micro-note" id="dailyRemainingBasis"></p>
           <div class="check-row"><input id="noDailyLimit" type="checkbox" /><label for="noDailyLimit">No daily loss cap applies to this profile</label></div>
           <p class="micro-note" id="dailyRule"></p>
           <a class="link-button" id="dailySource" target="_blank" rel="noopener noreferrer" hidden>Published daily loss rules</a>
@@ -64,23 +65,24 @@
           <div id="newInstrumentPanel" class="new-panel" hidden><div class="field-row"><div class="field"><label for="newInstrumentSymbol">Symbol</label><input id="newInstrumentSymbol" placeholder="e.g. XAUUSD" maxlength="24" /></div><div class="field"><label for="newInstrumentName">Description</label><input id="newInstrumentName" placeholder="Gold CFD" maxlength="80" /></div></div><button type="button" id="saveInstrumentBtn" class="small-primary">Create custom instrument</button></div>
           <div class="direction-toggle" role="group" aria-label="Trade direction"><button type="button" id="longBtn" class="active" aria-pressed="true">↑ Long</button><button type="button" id="shortBtn" aria-pressed="false">↓ Short</button></div>
           <div class="field-row">
-            <div class="check-row"><input id="useStop" type="checkbox" checked /><label for="useStop">Include stop-loss</label></div>
-            <div class="check-row"><input id="useTarget" type="checkbox" checked /><label for="useTarget">Include take-profit</label></div>
+            <div class="check-row"><input id="useStop" type="checkbox" checked /><label for="useStop">Use manual stop-loss</label></div>
+            <div class="check-row"><input id="useTarget" type="checkbox" checked /><label for="useTarget">Customize take-profit</label></div>
           </div>
           <div class="field-row"><div class="field"><label for="entry">Entry price</label><input type="number" id="entry" value="25000" step="any" inputmode="decimal" aria-describedby="quoteStatus" /><button type="button" id="currentPrice" class="link-button">Use current price</button></div><div class="field" id="stopModeField"><label for="stopMode">Stop expressed as</label><select id="stopMode"><option value="price">Actual stop price</option><option value="points">Points / price movement</option><option value="ticks">Ticks</option><option value="pips">Pips (FX only)</option><option value="budget">From drawdown budget</option></select></div></div>
           <p class="micro-note" id="quoteStatus" role="status"></p>
           <div class="field-row">
-            <div class="field" id="assumedMoveField" hidden><label for="assumedMove">Assumed adverse move (%)</label><input id="assumedMove" type="number" min="0.01" max="99.99" step="any" value="1" inputmode="decimal" aria-describedby="scenarioHelp" /></div>
+            <div class="field" id="assumedMoveField" hidden><label for="assumedMove">Automatic stop distance (%)</label><input id="assumedMove" type="number" min="0.01" max="99.99" step="any" value="1" inputmode="decimal" aria-describedby="scenarioHelp" /></div>
             <div class="field" id="manualStopField"><label for="stopInput" id="stopLabel">Structural stop price</label><input type="number" id="stopInput" value="24970" step="any" inputmode="decimal" /></div>
             <div class="field" id="plannedQuantityField" hidden><label for="plannedQuantity">Planned quantity <span id="plannedQuantityUnit"></span></label><input type="number" id="plannedQuantity" min="0" step="any" inputmode="decimal" aria-describedby="budgetStopNote" /></div>
             <div class="field" id="targetModeField"><label for="targetMode">Take-profit method</label><select id="targetMode"><option value="stop">From stop distance</option><option value="budget">From drawdown budget</option></select></div>
           </div>
-          <p class="micro-note" id="scenarioHelp" hidden>Enter your intended entry or use a supported quote. Scenario sizing assumes a 1% adverse move by default. Edit it for your instrument. Losses can exceed this estimate without a stop.</p>
+          <p class="micro-note" id="scenarioHelp" hidden>Automatic stop defaults to a 1% adverse move from entry.</p>
           <p class="micro-note" id="manualStopNote">Enter the technical invalidation price or distance to calculate the maximum position size.</p>
           <p class="micro-note" id="budgetStopNote" hidden>Enter the size you plan to trade. The calculated stop fits the selected loss budget after estimated costs and tick rounding.</p>
           <div class="field-row">
             <div class="field" id="rrField"><label for="rr" id="rrLabel">Target stop-distance multiple</label><input type="number" id="rr" step="any" min="0.01" value="3" inputmode="decimal"/></div>
           </div>
+          <p class="micro-note" id="autoTargetNote" hidden>Automatic take-profit uses 3× the stop distance.</p>
           <p class="micro-note" id="budgetTargetNote" hidden>The target aims for net profit equal to the selected loss budget times this multiple, accounting for estimated costs and tick size.</p>
           <p class="micro-note" id="feeSchedule"></p>
           <a class="link-button" id="feeSource" target="_blank" rel="noopener noreferrer" hidden>Published trading fees</a>
@@ -112,10 +114,9 @@
             <div class="ticket-line"><span id="lossLabel">Planned stop loss</span><b class="red" id="actualRisk">—</b></div>
             <div class="ticket-line"><span>Target net profit <small>(model)</small></span><b class="teal" id="targetProfit">—</b></div>
             <div class="ticket-line"><span>Effective net R : R</span><b id="effectiveRR">—</b></div>
-            <div class="ticket-line"><span>Stop-loss price</span><b id="stopPrice">—</b></div>
-            <div class="ticket-line"><span>Take-profit price</span><b id="targetPrice">—</b></div>
+            <div class="ticket-line"><span id="stopPriceLabel">Stop-loss price</span><b id="stopPrice">—</b></div>
+            <div class="ticket-line"><span id="targetPriceLabel">Take-profit price</span><b id="targetPrice">—</b></div>
             <div class="ticket-line"><span id="widthLabel">Stop width</span><b id="stopWidth">—</b></div>
-            <div class="ticket-line" id="scenarioPriceRow" hidden><span>Adverse scenario price</span><b id="scenarioPrice">—</b></div>
             <div class="ticket-line"><span>Estimated round-trip costs</span><b id="estimatedCosts">—</b></div>
             <div class="ticket-line"><span>Unused risk budget</span><b id="allocationUsed">—</b></div>
             <div class="ticket-line"><span>Estimated exposure <small>USD</small></span><b id="notional">—</b></div>
