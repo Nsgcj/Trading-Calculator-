@@ -220,10 +220,15 @@ test('invalid adverse move assumptions block sizing without a stop', () => {
   }
 });
 
-test('blocks sizing with a contract from another account platform', () => {
-  const result = sizePosition({ ...base, account: DEFAULT_ACCOUNTS[1], riskFraction: 0.6 });
-  assert.equal(result.status, 'BLOCKED');
-  assert.match(result.errors[0], /selected account platform/);
+test('sizes a futures contract with the selected personal account and flags compatibility', () => {
+  const personal = {...DEFAULT_ACCOUNTS[2], equity:3000, floor:1000, dailyRemaining:60, maxQuantity:3, verified:true};
+  const mnq = DEFAULT_INSTRUMENTS.find(spec => spec.id==='f-mnq');
+  const result = sizePosition({...base, account:personal, instrument:mnq, stopInput:24990, riskFraction:0.05});
+  assert.equal(result.status, 'VERIFY');
+  assert.equal(result.budget, 60);
+  assert.equal(result.quantity, 3);
+  assert.equal(result.risk, 60);
+  assert.ok(result.warnings.some(warning=>warning.includes('account offers this instrument')));
 });
 
 test('round-trip cost components are charged per unit', () => {
