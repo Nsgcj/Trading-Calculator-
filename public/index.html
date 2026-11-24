@@ -70,6 +70,7 @@
           </div>
           <div class="field-row"><div class="field"><label for="entry">Entry price</label><input type="number" id="entry" step="any" inputmode="decimal" aria-describedby="quoteStatus" /><button type="button" id="currentPrice" class="link-button">Refresh public price</button></div><div class="field" id="stopModeField"><label for="stopMode">Stop expressed as</label><select id="stopMode"><option value="price">Actual stop price</option><option value="points">Points / price movement</option><option value="ticks">Ticks</option><option value="pips">Pips (FX only)</option><option value="budget">From drawdown budget</option></select></div></div>
           <p class="micro-note" id="quoteStatus" role="status"></p>
+          <a class="link-button" id="mnqQuoteSource" href="https://www.cmegroup.com/markets/equities/nasdaq/micro-e-mini-nasdaq-100.quotes.html" target="_blank" rel="noopener noreferrer" hidden>View delayed MNQ quotes on CME</a>
           <div class="field-row">
             <div class="field" id="assumedMoveField" hidden><label for="assumedMove">Automatic stop distance (%)</label><input id="assumedMove" type="number" min="0.01" max="99.99" step="any" value="1" inputmode="decimal" aria-describedby="scenarioHelp" /></div>
             <div class="field" id="manualStopField"><label for="stopInput" id="stopLabel">Structural stop price</label><input type="number" id="stopInput" step="any" inputmode="decimal" /></div>
