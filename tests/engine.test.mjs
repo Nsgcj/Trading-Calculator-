@@ -1,6 +1,7 @@
+import { accountReferences } from '../public/account-references.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_ACCOUNTS, DEFAULT_INSTRUMENTS, MODES, sizePosition, roundQuantityDown } from '../public/engine.mjs';
+import { DEFAULT_ACCOUNTS, DEFAULT_INSTRUMENTS, MODES, sizePosition, resolveExitInputs, roundQuantityDown } from '../public/engine.mjs';
 const account={...DEFAULT_ACCOUNTS[0], verified:true};
 const instrument={...DEFAULT_INSTRUMENTS[0], verified:true};
 const base={account,instrument,side:'long',entry:25000,stopMode:'price',stopInput:24970,rr:5,slippageTicks:0,spreadTicks:0,feePerUnit:0,stressExtraTicks:2};
@@ -254,4 +255,50 @@ test('funded templates require their own account equity and failure floor', () =
     assert.equal(result.status, 'BLOCKED');
     assert.match(result.errors[0], /account equity, failure floor/);
   }
+});
+
+test('published round-turn fees use the selected account and contract', () => {
+  const contract = DEFAULT_INSTRUMENTS.find(spec => spec.id === 'f-mnq');
+  const preset = id => DEFAULT_ACCOUNTS.find(profile => profile.id === id);
+  assert.equal(accountReferences(preset('topstep'), contract).publishedFee, 1.22);
+  assert.equal(accountReferences(preset('mff-evaluation'), contract).publishedFee, 1.90);
+  assert.equal(accountReferences(preset('mff-live'), contract).publishedFee, undefined);
+  assert.equal(accountReferences(preset('take-profit-trader'), contract).publishedFee, 4.50);
+  assert.equal(accountReferences(preset('topstep'), {...contract, id:'instrument-custom'}).publishedFee, undefined);
+});
+
+test('a reported daily cap still applies unless the profile explicitly has none', () => {
+  const cappedAccount = {...account, dailyRemaining: 0.5};
+  const capped = sizePosition({...base, account:cappedAccount, riskFraction: 0.6});
+  const uncapped = sizePosition({...base, account:{...cappedAccount, noDailyLimit:true}, riskFraction: 0.6});
+  assert.equal(capped.budget, 0.5);
+  assert.equal(uncapped.budget, 6);
+  assert.equal(uncapped.warnings.some(warning => warning.includes('Daily loss allowance')), false);
+});
+
+test('empty or disabled exit inputs use automatic levels without accepting invalid manual values', () => {
+  const exits = resolveExitInputs({
+    useStop: true, useTarget: false, stopMode: 'price', stopInput: NaN,
+    targetMode: 'budget', rr: 8, assumedMovePercent: 1,
+  });
+  assert.equal(exits.stopMode, 'auto');
+  assert.equal(exits.targetMode, 'auto');
+  assert.equal(exits.rr, 3);
+  const invalid = resolveExitInputs({useStop:true, useTarget:true, stopMode:'price', stopInput:0, targetMode:'stop', rr:0});
+  assert.equal(invalid.stopMode, 'price');
+  assert.equal(invalid.rr, 0);
+});
+
+test('automatic exits derive long and short levels and retain them when the budget cannot fit a unit', () => {
+  const input = {...base, stopMode:'auto', targetMode:'auto', rr:3, assumedMovePercent:1, riskFraction:0.6};
+  const long = sizePosition(input);
+  const short = sizePosition({...input, side:'short'});
+  assert.equal(long.stop, 24750);
+  assert.equal(long.target, 25750);
+  assert.equal(short.stop, 25250);
+  assert.equal(short.target, 24250);
+  const blocked = sizePosition({...input, riskFraction:0.05});
+  assert.equal(blocked.status, 'BLOCKED');
+  assert.equal(blocked.stop, 24750);
+  assert.equal(blocked.target, 25750);
 });
