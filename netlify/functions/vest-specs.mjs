@@ -37,7 +37,7 @@ export default async function handler(request) {
     }
     // The Vest API defines the increment and minimum size as 10 ^ -sizeDecimals.
     // https://docs.vest.exchange/vest-api
-    const quantityStep = 10 ** -spec.sizeDecimals;
+    const quantityStep = Number(`1e-${spec.sizeDecimals}`);
     // Vest's ES and NQ sizing guide confirms the 1 USDC point value per native unit.
     // https://docs.vestmarkets.com/trading/cross-margin-and-leverage#sizing-for-futures-traders-micro-and-e-mini-equivalents
     return reply({
