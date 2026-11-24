@@ -220,12 +220,17 @@ function updateTargetMode(){
  $('budgetTargetNote').hidden=!budgetTarget;
 }
 function updateQuoteControl(){
- const supported=supportsCurrentPrice(selectedInstrument());
+ const instrument=selectedInstrument();
+ const supported=supportsCurrentPrice(instrument);
+ const isMnq=instrument.id==='f-mnq';
  $('currentPrice').hidden=!supported;
  $('currentPrice').disabled=false;
+ $('mnqQuoteSource').hidden=!isMnq;
  $('quoteStatus').textContent=$('entry').value
   ? 'Using your entered price.'
-  : supported?'The desk will load the last available public price.':'No public feed for this instrument. Enter your broker price.';
+  : supported?'The desk will load the last available public price.'
+  : isMnq?'Use the last price for your MNQ contract month. CME quotes are delayed.'
+  : 'No public feed for this instrument. Enter your broker price.';
 }
 function cancelQuote(){
  quoteRequest?.abort();
