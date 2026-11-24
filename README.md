@@ -46,11 +46,11 @@ Conservative slippage stress is shown separately. Models may miss gaps, stop rej
 - Under **Take-profit method**, choose **From drawdown budget** to target the selected budget times your chosen multiple in modeled net profit. A $25 budget at 2× targets at least $50 net after estimated costs. This works with a structural stop or a budget-based stop. **From stop distance** keeps the original price-distance calculation.
 - The comparison table shows stop and target prices for each mode. A budget-based price is a modeled loss or profit level. Check market structure and the venue's liquidation rules separately.
 
-### Sizing with optional exits
+### Automatic entry and exit levels
 
-- Toggle **Include stop-loss** and **Include take-profit** independently. With the stop off, enter an entry price and review the editable adverse-move assumption (1% by default). The desk sizes the scenario from your current account, risk mode, and entered costs. The scenario price and estimated exposure appear on the position ticket. Losses can exceed the scenario estimate without a stop.
-- **Use current price** fetches a snapshot for built-in BTC, ETH and SOL Coinbase USD spot or Hyperliquid perpetual instruments. For other markets, enter the current broker price manually. A quote snapshot does not update automatically.
-- With take-profit off, the ticket omits the target and reward figures. If take-profit is enabled with the stop off, a distance-based target uses the assumed adverse move.
+- Uncheck **Use manual stop-loss** or leave its input blank for an automatic stop. The default is a 1% adverse move from entry, adjusted to the instrument’s tick. Change the distance if you need a different scenario.
+- Uncheck **Customize take-profit** or leave its multiple blank for a target based on three times the stop distance. Valid manual inputs still apply.
+- With a missing entry or automatic exit, the desk fetches a quote snapshot for Vest NQ and ES perpetuals or the supported Coinbase spot and Hyperliquid perpetual instruments. **Use current price** refreshes the snapshot. For an unavailable market or feed, enter the quote from your broker. Suggested levels are for planning, and no orders are submitted.
 
 ### Instrument presets
 
@@ -78,6 +78,12 @@ The instrument dropdown shows the full catalog, grouped by platform and asset cl
 - **Load exchange specification** retrieves published tick size, quantity rules, and minimum order value for supported Binance USDⓈ-M and Bybit USDT perpetuals. If the endpoint is unavailable, existing values are kept. Reload published rules after 24 hours. The quote-to-USD conversion remains an input.
 - Enter total modeled slippage and any additional spread separately in ticks. Enter both sides of fees in USD per native unit. The ticket shows the estimated round-trip cost separately. Fee tiers, actual fills, funding, margin, liquidation, and prop account rules depend on the account and order.
 - Hyperliquid uses price-dependent precision. The fixed-tick calculator displays those contracts as estimates. Unverified Vest, FX, CFD and generic spot/share presets also depend on broker settings.
+
+### Published fees and daily limits
+
+Account presets show applicable public fee schedules and daily loss references. The calculator can apply a published flat round-trip cost for supported TopstepX, My Funded Futures and Take Profit Trader combinations. Use the number only when the schedule matches your account and platform. Fee inputs are remembered per account and instrument. Percentage fees, funding, broker-specific charges and live execution still depend on the order.
+
+A published daily cap is different from the allowance remaining after today’s P&L. The desk auto-fills the drawdown-based allowance from equity minus the current floor and reserve. Enter a separate remaining daily amount if your plan has one. The desk applies both constraints. Clear the field to return to the automatic value.
 
 ## Validation status
 
