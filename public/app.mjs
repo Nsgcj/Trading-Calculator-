@@ -36,7 +36,7 @@ let state=(()=>{
  } catch {}
  return { accounts:clone(DEFAULT_ACCOUNTS), instruments:clone(DEFAULT_INSTRUMENTS), accountId:'vest', instrumentId:'vest-nq', mode:'normal', modeFractions:{safe:.02,normal:.05,lottery:.60}, side:'long' };
 })();
-let currentResult=null,lastStopMode='price',quoteRequest,specRequest,quoteAt=0,exampleEntry=true,exampleStop=true;
+let currentResult=null,lastStopMode='price',quoteRequest,specRequest,entryQuote;
 function save(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));}catch{}}
 function selectedAccount(){return state.accounts.find(a=>a.id===state.accountId)||state.accounts[0];}
 function selectedInstrument(){return state.instruments.find(s=>s.id===state.instrumentId)??{};}
@@ -137,23 +137,18 @@ function syncAccountFields(){
 }
 function syncSpecFields(){
  syncAccountCommission();
+ $('copyLevelStatus').hidden=true;
  const s=selectedInstrument();
  cancelQuote();
- quoteAt=0;
+ entryQuote=null;
  updateQuoteControl();
- exampleEntry=true;
  specRequest?.abort();
  $('lookupSpec').disabled=false;
  $('lookupSpec').hidden=!supportsContractLookup(s);
  $('lookupStatus').hidden=true;
  renderSpec(s);
- const refPrice={NQ:25000,ES:6000,GC:4000,CL:80,RTY:2200,YM:42000,SI:35,NG:3,EURUSD:1.1,USDJPY:150,GBPUSD:1.3,AUDUSD:0.65,USDCAD:1.4,EURJPY:165,BTC:90000,ETH:3000,SOL:150,STOCK:100,OTHER:100};
- const price=refPrice[s.reference];
- const useDemo=!supportsCurrentPrice(s) && $('useStop').checked && $('useTarget').checked && price!==undefined;
- $('entry').value=useDemo?price:'';
- exampleStop=useDemo;
- const dist={NQ:30,ES:10,GC:10,CL:1,RTY:5,YM:50,SI:0.1,NG:0.05,EURUSD:0.002,USDJPY:0.2,GBPUSD:0.002,AUDUSD:0.002,USDCAD:0.002,EURJPY:0.2,BTC:500,ETH:25,SOL:2,STOCK:2,OTHER:2}[s.reference]??2;
- $('stopInput').value=!useDemo?'':Number((price+(state.side==='short'?dist:-dist)).toPrecision(11));
+ $('entry').value='';
+ $('stopInput').value='';
  if ($('stopMode').value!=='budget') $('stopMode').value='price';
  $('plannedQuantity').value='';
  $('plannedQuantityUnit').textContent=s.unit;
@@ -228,41 +223,39 @@ function updateQuoteControl(){
  const supported=supportsCurrentPrice(selectedInstrument());
  $('currentPrice').hidden=!supported;
  $('currentPrice').disabled=false;
- $('quoteStatus').textContent=supported?'Enter a price or fetch a quote snapshot.':'Enter your current broker price. Quote lookup is unavailable for this instrument.';
+ $('quoteStatus').textContent=$('entry').value
+  ? 'Using your entered price.'
+  : supported?'The desk will load the last available public price.':'No public feed for this instrument. Enter your broker price.';
 }
 function cancelQuote(){
  quoteRequest?.abort();
  quoteRequest=null;
 }
 function maybeFetchEntry(){
- const exits=exitInputs();
- const auto=exits.stopMode==='auto' || exits.targetMode==='auto' || $('entry').value==='';
- if(!auto) return;
- if(exampleEntry) $('entry').value='';
- if(exampleStop){
-  $('stopInput').value='';
-  exampleStop=false;
- }
- if(supportsCurrentPrice(selectedInstrument()) && !quoteRequest && Date.now()-quoteAt>30000) void fetchEntry();
+ if($('entry').value==='' && supportsCurrentPrice(selectedInstrument()) && !quoteRequest) void fetchEntry();
+}
+function describeQuote({source,time,lastKnown}){
+ const timestamp=Number.isFinite(time)?new Date(time).toLocaleString():'';
+ return [source,lastKnown?'last known price':'public quote',timestamp].filter(Boolean).join(' · ');
 }
 async function fetchEntry(){
  cancelQuote();
  const request=new AbortController();
  quoteRequest=request;
  $('currentPrice').disabled=true;
- $('quoteStatus').textContent='Fetching a quote…';
+ $('quoteStatus').textContent='Fetching the last available public price…';
  refresh();
  try {
-  const {price,source,time}=await getCurrentPrice(selectedInstrument(),{signal:request.signal});
+  const quote=await getCurrentPrice(selectedInstrument(),{signal:request.signal});
   if (request.signal.aborted) return;
-  $('entry').value=price;
-  if(exampleStop) $('stopInput').value='';
-  exampleStop=false;
-  exampleEntry=false;
-  quoteAt=Date.now();
-  $('quoteStatus').textContent=source+' snapshot · '+new Date(time??quoteAt).toLocaleTimeString();
+  entryQuote=quote;
+  $('entry').value=quote.price;
+  $('quoteStatus').textContent=describeQuote(quote);
  } catch {
-  if (!request.signal.aborted) $('quoteStatus').textContent=$('entry').value ? 'Quote unavailable. Levels use the entry shown.' : 'Quote unavailable. Enter the current price from your broker.';
+  if (!request.signal.aborted) {
+   const previous=entryQuote?describeQuote({...entryQuote,lastKnown:true}):'Using your entered price.';
+   $('quoteStatus').textContent=$('entry').value?'Quote refresh unavailable. '+previous:'Public price unavailable. Enter your broker price.';
+  }
  } finally {
   if (quoteRequest===request){
    quoteRequest=null;
@@ -300,6 +293,25 @@ function renderSummary(r){
  $('floorText').textContent=h?`${usd(h.usable)} usable`:'—';
  $('floorFill').style.width=h&&h.raw>0?`${Math.min(100,Math.max(0,(r?.budget??0)/h.raw*100))}%`:'0%';
 }
+function formatExitPrice(price){
+ const [coefficient,exponent='0']=String(selectedInstrument().tickSize).split('e');
+ const precision=Math.max(0,(coefficient.split('.')[1]?.length??0)-Number(exponent));
+ return fmt(price,Math.max(10,Math.min(20,precision)));
+}
+function renderExitPrice(field,button,price){
+ $(field).textContent=formatExitPrice(price);
+ $(button).disabled=!Number.isFinite(price) || price<=0;
+}
+async function copyExitPrice(field,label){
+ const price=$(field).textContent;
+ $('copyLevelStatus').hidden=false;
+ try {
+  await navigator.clipboard.writeText(price.replaceAll(',',''));
+  $('copyLevelStatus').textContent=label+' copied.';
+ } catch {
+  $('copyLevelStatus').textContent='Clipboard unavailable. Select and copy the price directly.';
+ }
+}
 function renderTicket(r){
  const good=r&&r.status!=='BLOCKED'&&Number.isFinite(r.quantity),s=selectedInstrument();
  $('statusChip').className='state-chip '+(r?.status==='CALCULATED'?'calculated':r?.status==='BLOCKED'?'blocked':'');
@@ -318,12 +330,12 @@ function renderTicket(r){
  $('actualRisk').textContent=good?'−'+usd(r.risk):'—';
  $('targetProfit').textContent=good?usd(r.expectedReward):'—';
  $('effectiveRR').textContent=good&&Number.isFinite(r.rrNet)?`1 : ${fmt(r.rrNet,2)}`:'—';
- $('stopPrice').textContent=fmt(r.stop,10);
- $('targetPrice').textContent=fmt(r.target,10);
+ renderExitPrice('stopPrice','copyStopPrice',r.stop);
+ renderExitPrice('targetPrice','copyTargetPrice',r.target);
  $('stopWidth').textContent=good?`${fmt(r.stopDistance,6)} pts · ${fmt(r.stopTicks,2)} ticks`:'—';
  $('stressRisk').textContent=good?'−'+usd(r.stressRisk):'—';
  $('statusMessage').className='status-message '+(r?.status==='BLOCKED'?'blocked':r?.status==='CALCULATED'?'verified':'');
- $('statusMessage').textContent=quoteRequest?'Fetching current price before sizing…':r?.status==='BLOCKED'?'BLOCKED — '+(r.errors[0]||'One or more hard risk checks failed.') :r?.status==='VERIFY'?'VERIFY BEFORE USE — numbers are illustrative; check the account rules and any unverified contract assumptions.':'SIZED — values include entered execution costs. This is not broker permission to execute.';
+ $('statusMessage').textContent=quoteRequest?'Fetching public price before sizing…':r?.status==='BLOCKED'?'BLOCKED — '+(r.errors[0]||'One or more hard risk checks failed.') :r?.status==='VERIFY'?'VERIFY BEFORE USE — numbers are illustrative; check the account rules and any unverified contract assumptions.':'SIZED — values include entered execution costs. This is not broker permission to execute.';
  $('warningList').replaceChildren(...(r?.warnings||[]).map(message=>{const el=document.createElement('div');el.className='warning-item';el.textContent=message;return el;}));
  if(r?.errors?.length>1)for(const message of r.errors.slice(1)){const el=document.createElement('div');el.className='warning-item';el.textContent=message;$('warningList').append(el);}
  $('copyBtn').disabled=r?.status!=='CALCULATED';
@@ -469,10 +481,7 @@ function init(){
  }
  $('currentPrice').addEventListener('click',fetchEntry);
  $('entry').addEventListener('input',()=>{
-  cancelQuote();quoteAt=0;
-  exampleEntry=false;
-  if(exampleStop) $('stopInput').value='';
-  exampleStop=false;
+  cancelQuote();entryQuote=null;
   updateQuoteControl();refresh();
  });
  $('entry').addEventListener('change',()=>{
@@ -482,7 +491,7 @@ function init(){
  for(const id of ['stopInput','plannedQuantity','rr'])$(id).addEventListener('change',()=>{
   maybeFetchEntry();refresh();
  });
- $('stopInput').addEventListener('input',()=>{exampleStop=false;refresh();});
+ $('stopInput').addEventListener('input',refresh);
  for(const id of ['assumedMove','plannedQuantity','rr','stressTicks'])$(id).addEventListener('input',refresh);
  for(const id of ['slippageTicks','spreadTicks'])$(id).addEventListener('input',refresh);
  $('feePerUnit').addEventListener('input',updateCommission);
@@ -518,6 +527,8 @@ function init(){
   delete s.sourceUrl;
   state.instruments.push(s);state.instrumentId=id;fillInstruments();syncSpecFields();$('newInstrumentPanel').hidden=true;save();refresh();
  });
+ $('copyStopPrice').addEventListener('click',()=>copyExitPrice('stopPrice','Stop-loss'));
+ $('copyTargetPrice').addEventListener('click',()=>copyExitPrice('targetPrice','Take-profit'));
  $('copyBtn').addEventListener('click',async()=>{
   const r=currentResult;if(!r||r.status!=='CALCULATED')return;
   const a=selectedAccount(),s=selectedInstrument();
@@ -525,7 +536,6 @@ function init(){
   try{await navigator.clipboard.writeText(plan);$('copyBtn').textContent='Copied ✓';setTimeout(()=>{$('copyBtn').innerHTML='Copy position plan <span>↗</span>';},1800);}catch{const old=$('copyBtn').textContent;$('copyBtn').textContent='Clipboard unavailable — use HTTPS';setTimeout(()=>{$('copyBtn').textContent=old;},1800);}
  });
  $('resetBtn').addEventListener('click',()=>{if(!window.confirm('Reset saved accounts and instrument settings to examples?'))return;localStorage.removeItem(STORAGE_KEY);window.location.reload();});
- // Direction state survives refresh; entry and price remain illustrative until manually edited.
  for(const key of ['long','short']){$(key+'Btn').classList.toggle('active',state.side===key);$(key+'Btn').setAttribute('aria-pressed',String(state.side===key));}
  refresh();
 }
