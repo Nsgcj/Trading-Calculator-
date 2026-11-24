@@ -438,6 +438,13 @@ function openAccountPanel(fromAccount){
 }
 function init(){
  $('newAccountStage').replaceChildren(...Object.entries(ACCOUNT_STAGES).map(([id,label])=>new Option(label,id)));
+ const entryUrl=new URL(window.location.href);
+ const plannedInstrument=entryUrl.searchParams.get('instrument');
+ if(state.instruments.some(instrument=>instrument.id===plannedInstrument)){
+  state.instrumentId=plannedInstrument;
+  entryUrl.searchParams.delete('instrument');
+  window.history.replaceState(null,'',entryUrl);
+ }
  fillAccounts();fillInstruments();syncAccountFields();syncSpecFields();setMode(state.mode||'normal');
  $('accountSelect').addEventListener('change',()=>{
   const previousInstrument=state.instrumentId;

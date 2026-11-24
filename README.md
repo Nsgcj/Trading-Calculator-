@@ -46,6 +46,10 @@ Conservative slippage stress is shown separately. Models may miss gaps, stop rej
 - Under **Take-profit method**, choose **From drawdown budget** to target the selected budget times your chosen multiple in modeled net profit. A $25 budget at 2× targets at least $50 net after estimated costs. This works with a structural stop or a budget-based stop. **From stop distance** keeps the original price-distance calculation.
 - The comparison table shows stop and target prices for each mode. A budget-based price is a modeled loss or profit level. Check market structure and the venue's liquidation rules separately.
 
+### Trade Planner
+
+Open **Trade Planner** to see active sessions, the next open and suggested watchlists. Times default to Eastern Time. The display time zone can be changed without moving the underlying session hours. Select an asset to load it into the Risk Calculator with the current sizing account. Watchlists reflect session timing. Exchange holidays, maintenance and broker limits can differ.
+
 ### Automatic entry and exit levels
 
 - Uncheck **Use manual stop-loss** or leave its input blank for an automatic stop. The default is a 1% adverse move from entry, adjusted to the instrument’s tick. Change the distance if you need a different scenario.
