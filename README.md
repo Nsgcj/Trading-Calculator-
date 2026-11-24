@@ -83,6 +83,7 @@ The instrument dropdown shows the full catalog, grouped by platform and asset cl
 
 Account presets show applicable public fee schedules and daily loss references. The calculator can apply a published flat round-trip cost for supported TopstepX, My Funded Futures and Take Profit Trader combinations. Use the number only when the schedule matches your account and platform. Fee inputs are remembered per account and instrument. Percentage fees, funding, broker-specific charges and live execution still depend on the order.
 
+A published daily cap is different from the allowance remaining after today’s P&L. Enter the current remaining amount to include it in sizing, or select **No daily loss cap applies to this profile** if appropriate. The account’s drawdown floor still applies.
 A published daily cap is different from the allowance remaining after today’s P&L. The desk auto-fills the drawdown-based allowance from equity minus the current floor and reserve. Enter a separate remaining daily amount if your plan has one. The desk applies both constraints. Clear the field to return to the automatic value.
 
 ## Validation status

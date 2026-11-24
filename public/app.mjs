@@ -366,6 +366,7 @@ function refresh(){
  const r=sizePosition(params());currentResult=r;
  renderSummary(r);renderTicket(r);renderModes();renderUnits(r);
 }
+function updateAccount(){const a=selectedAccount();for(const k of ['equity','floor','reserve'])a[k]=inputNumber(k);for(const k of ['dailyRemaining','maxQuantity'])a[k]=optionalNumber(k);a.verified=$('accountVerified').checked;a.noDailyLimit=$('noDailyLimit').checked;$('dailyRemaining').disabled=a.noDailyLimit;save();refresh();}
 function updateAccount(event){
  const account=selectedAccount();
  for(const key of ['equity','floor','reserve']) account[key]=inputNumber(key);
@@ -479,6 +480,9 @@ function init(){
   if($('entry').value==='') maybeFetchEntry();
   refresh();
  });
+ $('stopMode').addEventListener('change',switchStopMode);
+ $('targetMode').addEventListener('change',updateTargetMode);
+ for(const id of ['assumedMove','stopInput','plannedQuantity','rr','stressTicks'])$(id).addEventListener('input',refresh);
  for(const id of ['stopInput','plannedQuantity','rr'])$(id).addEventListener('change',()=>{
   maybeFetchEntry();refresh();
  });

@@ -370,6 +370,7 @@ export function sizePosition(p) {
   if (fees===0) warnings.push('Modeled commission is $0. Estimated costs can differ from actual execution.');
   if (stressRisk > h.usable + nearly) warnings.push('Stress slippage could penetrate the safety reserve / failure floor.');
   if (riskFraction>=0.25) warnings.push('High-risk mode: one adverse move could consume a large share of available drawdown.');
+  if (!a.noDailyLimit && a.stage!=='personal' && (a.dailyRemaining==null || a.dailyRemaining==='')) warnings.push('Daily loss allowance is unknown. Enter today’s remaining amount or select no daily cap if it applies.');
   if (!a.noDailyLimit && a.stage!=='personal' && (a.dailyRemaining==null || a.dailyRemaining==='')) warnings.push('Sizing uses remaining drawdown. Enter any separate daily loss allowance from your plan.');
   const verified=Boolean(a.verified && specCurrent);
   return {
