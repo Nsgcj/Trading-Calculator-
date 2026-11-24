@@ -48,7 +48,7 @@ Conservative slippage stress is shown separately. Models may miss gaps, stop rej
 
 ### Trade Planner
 
-Open **Trade Planner** to see active sessions, the next open and suggested watchlists. Times default to Eastern Time. The display time zone can be changed without moving the underlying session hours. Select an asset to load it into the Risk Calculator with the current sizing account. Watchlists reflect session timing. Exchange holidays, maintenance and broker limits can differ.
+Open **Trade Planner** for the Chicken Man execution windows, the broader 24-hour asset rotation, and exchange market hours. The execution view shows the current and next windows, the New York opening steps, and the midday pause on new entries. Use the references for per-asset windows, recurring events and the execution checklist. Times default to Eastern Time and the display zone can be changed without moving session hours. Select a linked asset to open it in the Risk Calculator with the current sizing account. Check exchange holidays, maintenance and broker-specific limits.
 
 ### Automatic entry and exit levels
 

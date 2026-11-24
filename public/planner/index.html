@@ -28,7 +28,7 @@
       <section class="planner-heading" aria-labelledby="planner-title">
         <div>
           <h1 id="planner-title">Trade Planner</h1>
-          <p>See which sessions are active and build a watchlist for the next open.</p>
+          <p>Follow your execution windows, check market hours, and prepare the next watchlist.</p>
         </div>
         <div class="planner-clock">
           <time id="planner-date"></time>
@@ -47,6 +47,15 @@
       </section>
 
       <fieldset class="planner-filters">
+        <legend>Planner view</legend>
+        <div>
+          <button type="button" data-view="execution" aria-pressed="true">Chicken Man execution</button>
+          <button type="button" data-view="rotation" aria-pressed="false">24-hour rotation</button>
+          <button type="button" data-view="markets" aria-pressed="false">Market hours</button>
+        </div>
+      </fieldset>
+
+      <fieldset id="market-filters" class="planner-filters" hidden>
         <legend>Filter by asset</legend>
         <div>
           <button type="button" data-asset="all" aria-pressed="true">All markets</button>
@@ -79,10 +88,41 @@
         <div id="upcoming-sessions" class="session-timeline"></div>
       </section>
 
-      <p class="planner-coverage">Watchlists follow session hours. Check your venue for holiday changes, maintenance, and account restrictions.</p>
+      <section class="panel planner-agenda" id="opening-plan" aria-labelledby="opening-title" hidden>
+        <div class="planner-section-heading"><h2 id="opening-title">New York opening sequence</h2></div>
+        <div id="opening-steps" class="session-timeline"></div>
+      </section>
+
+      <section id="rotation-references" class="planner-references" aria-label="Trading playbook reference">
+        <details class="panel">
+          <summary>Primary and secondary windows by asset</summary>
+          <p>Windows are in Eastern Time unless keyed to a local open. Use Market hours to check seasonal shifts and lunch breaks.</p>
+          <label for="asset-window-search">Find an asset or pair</label>
+          <input id="asset-window-search" type="search" placeholder="e.g. MNQ, USD/JPY, gold" />
+          <div id="asset-window-tables"></div>
+        </details>
+        <details class="panel">
+          <summary>Institutional timing events</summary>
+          <p>These are recurring reference times. Releases, auctions and Fed decisions appear here as timing references. Check the official calendar for the actual date and time.</p>
+          <div class="table-wrap" id="timing-events"></div>
+        </details>
+        <details class="panel">
+          <summary>Execution checklist</summary>
+          <ol>
+            <li><strong>Account eligibility</strong> · Firm restrictions, drawdown and available risk.</li>
+            <li><strong>Market eligibility</strong> · Check that the asset is in its execution window.</li>
+            <li><strong>Fundamental environment</strong> · Check scheduled releases, news restrictions and intermarket conditions.</li>
+            <li><strong>Higher-time-frame structure</strong> · Establish daily, 4H and 1H context.</li>
+            <li><strong>Execution confirmation</strong> · Look for a liquidity sweep, CHoCH/BOS, displacement and a pullback.</li>
+            <li><strong>Risk and execution</strong> · Confirm the structural stop, size, targets and room to move.</li>
+          </ol>
+        </details>
+      </section>
+
+      <p class="planner-coverage">The execution and rotation windows follow your guide. Check your venue for holiday changes, maintenance, and account restrictions.</p>
       <details class="planner-sources">
         <summary>Schedule sources and coverage</summary>
-        <p>Select a symbol to open it in the Risk Calculator. Forex windows are regional focus hours. Cash and futures cards show the covered exchange sessions.</p>
+        <p>Execution and rotation windows come from your guide. Forex sessions are regional focus hours. Overseas cash sessions show regular hours and breaks. Holiday coverage varies by venue. Linked symbols open in the Risk Calculator.</p>
         <ul id="schedule-sources"></ul>
       </details>
     </main>
