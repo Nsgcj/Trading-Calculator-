@@ -252,6 +252,17 @@ export function getRiskBudget(account, riskFraction) {
   }
   return Math.max(0, budget);
 }
+export function resolveExitInputs({useStop,useTarget,stopMode,stopInput,plannedQuantity,assumedMovePercent,targetMode,rr}) {
+  const automaticStop=!useStop || Number.isNaN(stopMode==='budget'?plannedQuantity:stopInput);
+  const automaticTarget=!useTarget || Number.isNaN(rr);
+  return {
+    stopMode:automaticStop?'auto':stopMode,
+    stopInput,plannedQuantity,assumedMovePercent:Number.isNaN(assumedMovePercent)?1:assumedMovePercent,
+    targetMode:automaticTarget?'auto':targetMode,
+    rr:automaticTarget?3:rr,
+  };
+}
+
 /**
  * Budget stops use a fixed plannedQuantity. Other stop modes size from stopInput.
  * With targetMode 'budget', rr multiplies the selected dollar budget for the net profit goal.
@@ -264,6 +275,7 @@ export function sizePosition(p) {
   const budgetStop=p.stopMode==='budget', budgetTarget=p.targetMode==='budget';
   const plannedQuantity=numeric(p.plannedQuantity);
   const noStop=p.stopMode==='none', noTarget=p.targetMode==='none';
+  const autoStop=p.stopMode==='auto', autoTarget=p.targetMode==='auto';
   const assumedMovePercent=numeric(p.assumedMovePercent);
   const tick=numeric(s.tickSize), pointQuote=numeric(s.pointValueQuote), fx=numeric(s.quoteToUSD), step=numeric(s.quantityStep), minQ=numeric(s.minQuantity);
   const slip=numeric(p.slippageTicks ?? 0), spread=numeric(p.spreadTicks ?? 0), fees=numeric(p.feePerUnit ?? 0), stressExtra=numeric(p.stressExtraTicks ?? 2);
@@ -274,16 +286,16 @@ export function sizePosition(p) {
   if (budget === null) errors.push('Risk fraction or daily-loss allowance is invalid.');
   else if (budget <= 0) errors.push('Risk allowance is zero. No trade.');
   if (!finitePositive(entry)) errors.push('Entry price must be positive.');
-  if (!noStop && !budgetStop && !finitePositive(requested)) errors.push('Stop must be a positive number.');
-  if (noStop && (!finitePositive(assumedMovePercent) || assumedMovePercent>=100)) errors.push('Enter an assumed adverse move greater than 0% and below 100%.');
+  if (!noStop && !autoStop && !budgetStop && !finitePositive(requested)) errors.push('Stop must be a positive number.');
+  if ((noStop || autoStop) && (!finitePositive(assumedMovePercent) || assumedMovePercent>=100)) errors.push('Enter an assumed adverse move greater than 0% and below 100%.');
   if (budgetStop && !finitePositive(plannedQuantity)) errors.push('Enter your planned position quantity in native units.');
   if (!finitePositive(tick) || !finitePositive(pointQuote) || !finitePositive(fx)) errors.push('Instrument tick size, point value and quote→USD rate must all be positive.');
   if (!finitePositive(step) || !finitePositive(minQ) || minQ < step - nearly) errors.push('Instrument quantity step/minimum are invalid.');
   if (!noTarget && !finitePositive(rr)) errors.push('Reward multiple must be positive.');
   if (![slip,spread,fees,stressExtra].every(finiteNonnegative)) errors.push('Trading costs and stress ticks cannot be negative.');
   if (!['long','short'].includes(p.side)) errors.push('Choose long or short.');
-  if (!['price','points','ticks','pips','budget','none'].includes(p.stopMode)) errors.push('Invalid stop unit.');
-  if (p.targetMode!==undefined && !['stop','budget','none'].includes(p.targetMode)) errors.push('Invalid take-profit method.');
+  if (!['price','points','ticks','pips','budget','none','auto'].includes(p.stopMode)) errors.push('Invalid stop unit.');
+  if (p.targetMode!==undefined && !['stop','budget','none','auto'].includes(p.targetMode)) errors.push('Invalid take-profit method.');
   if (p.stopMode==='pips' && !finitePositive(numeric(s.pipSize))) errors.push('Pips require a verified pip size in the instrument settings.');
   const maxQ=(a.maxQuantity===null||a.maxQuantity===''||a.maxQuantity===undefined)?null:numeric(a.maxQuantity);
   if (maxQ!==null && !finiteNonnegative(maxQ)) errors.push('Max account quantity cannot be negative.');
@@ -311,9 +323,11 @@ export function sizePosition(p) {
       return blocked('The risk budget cannot fit an adverse price tick at this quantity.');
     }
     warnings.push('Budget stop is a modeled loss limit. Check the price against market structure and venue liquidation rules.');
-  } else if (noStop) {
+  } else if (noStop || autoStop) {
     stopRaw=entry+direction*entry*(assumedMovePercent/100);
-    warnings.push('Sizing scenario only. Without a stop, actual losses can exceed the modeled loss and account limits.');
+    warnings.push(autoStop
+      ? 'Automatic stop uses the assumed adverse move. It does not use chart structure.'
+      : 'Sizing scenario only. Without a stop, actual losses can exceed the modeled loss and account limits.');
   } else if (p.stopMode==='price') stopRaw=requested;
   else {
     const distance = requested * (p.stopMode==='ticks'?tick:p.stopMode==='pips'?numeric(s.pipSize):1);
@@ -326,20 +340,25 @@ export function sizePosition(p) {
   if (p.side==='long' && !(stop<entry) || p.side==='short' && !(stop>entry)) errors.push('Stop must be beyond entry in the loss direction.');
   if (!finitePositive(distance)) errors.push('Stop distance is zero.');
   if (errors.length) return {status:'BLOCKED',warnings,errors,headroom:h,budget};
+  const targetDirection=budgetTarget?-direction:direction;
+  const targetAt=distance=>tickRound(entry-direction*distance,tick,targetDirection>0?'up':'down');
+  const validTarget=price=>finitePositive(price) && direction*(entry-price)>0;
+  const priceTarget=noTarget || budgetTarget?undefined:targetAt(distance*rr);
+  const suggestedLevels=autoStop || autoTarget
+    ? {stop:noStop?undefined:stop,target:validTarget(priceTarget)?priceTarget:undefined,entry,stopMode:p.stopMode,targetMode:p.targetMode}
+    : {};
   const minNotional=numeric(s.minNotionalQuote ?? 0);
   if (!finiteNonnegative(minNotional)) return blocked('Minimum order value must be nonnegative.');
   const lossPerUnit=distance*pointUSD+costsPerUnit;
   const qtyRisk=budgetStop?plannedQuantity:roundQuantityDown(budget/lossPerUnit,step);
   const qty=budgetStop || maxQ===null?qtyRisk:Math.min(qtyRisk,roundQuantityDown(maxQ,step));
   if (qty+nearly<minQ) errors.push(`Minimum size ${minQ} ${s.unit} would exceed the risk allowance; skip the trade or use a smaller contract.`);
-  if (errors.length) return {status:'BLOCKED',warnings,errors,headroom:h,budget,minimumUnitRisk:lossPerUnit*minQ};
-  if (qty*entry*pointQuote<minNotional) return blocked('Order value at entry is below the entered venue minimum.');
+  if (errors.length) return {status:'BLOCKED',warnings,errors,headroom:h,budget,...suggestedLevels,minimumUnitRisk:lossPerUnit*minQ};
+  if (qty*entry*pointQuote<minNotional) return {...blocked('Order value at entry is below the entered venue minimum.'),...suggestedLevels};
   const risk=qty*lossPerUnit;
   if (!finitePositive(risk) || risk-budget>budget*1e-10) return blocked('Modeled loss exceeds the risk budget at this quantity.');
-  const targetDistance=budgetTarget?(budget*rr/qty+costsPerUnit)/pointUSD:distance*rr;
-  const targetDirection=budgetTarget?-direction:direction;
-  const target=noTarget?undefined:tickRound(entry-direction*targetDistance,tick,targetDirection>0?'up':'down');
-  if (!noTarget && (!finitePositive(target) || !(direction*(entry-target)>0))) return blocked('Target price is outside the valid price range; adjust the target multiple.');
+  const target=budgetTarget?targetAt((budget*rr/qty+costsPerUnit)/pointUSD):priceTarget;
+  if (!noTarget && !validTarget(target)) return blocked('Target price is outside the valid price range; adjust the target multiple.');
   const grossTarget=noTarget?undefined:Math.abs(target-entry)*pointUSD*qty;
   const roundTripCosts=qty*costsPerUnit;
   const reward=noTarget?undefined:grossTarget-roundTripCosts;
