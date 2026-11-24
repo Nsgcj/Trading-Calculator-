@@ -1,6 +1,7 @@
 import {accountReferences} from './account-references.mjs';
 import {supportsContractLookup,fetchContractSpec} from './contract-specs.mjs';
 import {getCurrentPrice,supportsCurrentPrice} from './quotes.mjs';
+import {ACCOUNT_STAGES,MODES,DEFAULT_ACCOUNTS,DEFAULT_INSTRUMENTS,sizePosition,getHeadroom,getRiskBudget,usd,fmt} from './engine.mjs';
 import {ACCOUNT_STAGES,MODES,DEFAULT_ACCOUNTS,DEFAULT_INSTRUMENTS,sizePosition,resolveExitInputs,getHeadroom,getRiskBudget,usd,fmt} from './engine.mjs';
 const STORAGE_KEY='chicken-man-riskdesk-v1';
 const $=id=>document.getElementById(id);
