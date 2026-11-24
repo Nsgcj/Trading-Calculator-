@@ -1,7 +1,12 @@
 const supportedCoins = new Set(['BTC', 'ETH', 'SOL', 'XRP', 'DOGE', 'ADA', 'LINK', 'AVAX', 'SUI']);
+const vestMarkets = new Map([['vest-nq', 'NQ-PERP'], ['vest-es', 'ES-PERP']]);
 
 function venueFor(instrument) {
   const venue = instrument?.platform;
+  if (venue === 'vest') {
+    const symbol = vestMarkets.get(instrument.id);
+    return symbol && instrument.symbol === symbol && instrument.unit === 'units' ? venue : null;
+  }
   if (venue !== 'binance-linear' && venue !== 'bybit-linear') return null;
   const coin = instrument.unit;
   if (!supportedCoins.has(coin) || instrument.id !== `${venue}-${coin.toLowerCase()}`) return null;
@@ -70,14 +75,28 @@ function parseBybit(data, instrument) {
   };
 }
 
+function parseVest(data, instrument) {
+  if (data?.symbol !== instrument.symbol || data.pointValueQuote !== 1) return null;
+  return {
+    tickSize: number(data.tickSize),
+    quantityStep: number(data.quantityStep),
+    minQuantity: number(data.minQuantity),
+    pointValueQuote: data.pointValueQuote,
+    source: `Vest Markets Exchange Info and contract sizing guide (${instrument.symbol}, USDC)`,
+  };
+}
+
 export async function fetchContractSpec(instrument, { signal } = {}) {
   const venue = venueFor(instrument);
   if (!venue) throw new Error('Official contract lookup is unavailable for this instrument.');
 
   const binance = venue === 'binance-linear';
+  const vest = venue === 'vest';
   const url = binance
     ? 'https://fapi.binance.com/fapi/v1/exchangeInfo'
-    : `https://api.bybit.com/v5/market/instruments-info?category=linear&symbol=${instrument.symbol}`;
+    : vest
+      ? `/.netlify/functions/vest-specs?market=${instrument.id.slice('vest-'.length)}`
+      : `https://api.bybit.com/v5/market/instruments-info?category=linear&symbol=${instrument.symbol}`;
   const response = await fetch(url, {
     cache: 'no-store',
     credentials: 'omit',
@@ -85,9 +104,10 @@ export async function fetchContractSpec(instrument, { signal } = {}) {
   });
   if (!response.ok) throw new Error('Official specifications are unavailable. Check the venue and enter the values manually.');
   const data = await response.json();
-  const spec = binance ? parseBinance(data, instrument) : parseBybit(data, instrument);
-  if (!spec || ![spec.tickSize, spec.quantityStep, spec.minQuantity, spec.minNotionalQuote].every(positive)) {
-    throw new Error('No usable specification was returned for this active USDT perpetual.');
+  const spec = binance ? parseBinance(data, instrument) : vest ? parseVest(data, instrument) : parseBybit(data, instrument);
+  if (!spec || ![spec.tickSize, spec.quantityStep, spec.minQuantity].every(positive)
+    || (!vest && !positive(spec.minNotionalQuote))) {
+    throw new Error('The venue did not return usable specifications for this perpetual.');
   }
   // An order must meet the tighter minimum while remaining on both quantity grids.
   if (!isAligned(spec.minQuantity, spec.quantityStep)) {

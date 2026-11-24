@@ -63,3 +63,29 @@ test('the broader rotation covers rollover and crosses midnight through late Asi
   assert.equal(overnight.next.start.toISOString(), '2026-11-24T07:00:00.000Z');
   assert.ok(overnight.timeline.every(window => window.assets.every(Boolean)));
 });
+
+test('previous rotation shows the completed window during an active opening phase', () => {
+  const current = personal('2026-11-24T14:45:00Z');
+  assert.equal(current.current.id, 'ny-equity-window');
+  assert.equal(current.previous.id, 'ny-equity-prep');
+  assert.equal(current.previous.end.toISOString(), '2026-11-24T14:30:00.000Z');
+
+  const market = getMarketRotation(new Date('2026-11-24T14:45:00Z'));
+  assert.equal(market.current.id, 'cash-open-overlap');
+  assert.equal(market.previous.id, 'macro-premarket');
+  assert.equal(market.previous.end.toISOString(), '2026-11-24T14:30:00.000Z');
+});
+
+test('weekend rotations show the last real window rather than the intervening gap', () => {
+  const now = new Date('2026-11-29T16:00:00Z');
+  const strategy = getRotation(now);
+  assert.equal(strategy.current.id, 'off-window');
+  assert.equal(strategy.previous.id, 'mandatory-downtime');
+  assert.equal(strategy.previous.end.toISOString(), '2026-11-27T18:00:00.000Z');
+  assert.equal(strategy.current.start.getTime(), strategy.previous.end.getTime());
+
+  const market = getMarketRotation(now);
+  assert.equal(market.current.id, 'off-window');
+  assert.equal(market.previous.id, 'post-market');
+  assert.equal(market.previous.end.toISOString(), '2026-11-27T22:00:00.000Z');
+});

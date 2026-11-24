@@ -294,6 +294,7 @@ function occurrence(definition, day) {
 export function getSchedule(now = new Date(), { kind } = {}) {
   const active = [];
   const later = [];
+  const completed = [];
   for (const definition of SESSION_DEFINITIONS) {
     if (kind && kind !== 'all' && definition.kind !== kind) continue;
     const today = localDay(now, definition.timeZone);
@@ -301,17 +302,27 @@ export function getSchedule(now = new Date(), { kind } = {}) {
       active.push({ ...definition, start: new Date(today), end: new Date(today + DAY) });
       continue;
     }
-    // Overnight CME sessions can have started on the prior local day. A week covers long weekends.
+    let lastCompleted;
+    // Overnight CME sessions can have started on the prior local day.
     for (let offset = -1; offset <= 7; offset++) {
       const session = occurrence(definition, today + offset * DAY);
       if (!session) continue;
-      if (session.start <= now && now < session.end) active.push(session);
       if (session.start > now) later.push(session);
+      else if (session.end <= now) lastCompleted = session;
+      else active.push(session);
     }
+    // Look beyond the usual two trading dates for long weekends and overseas holidays.
+    for (let offset = -2; !lastCompleted && offset >= -14; offset--) {
+      const session = occurrence(definition, today + offset * DAY);
+      if (session && session.end <= now) lastCompleted = session;
+    }
+    if (lastCompleted) completed.push(lastCompleted);
   }
   later.sort((a, b) => a.start - b.start);
   const nextStart = later[0]?.start.getTime();
   const next = later.filter(session => session.start.getTime() === nextStart);
   const withinDay = later.filter(session => session.start - now <= DAY);
-  return { active, next, upcoming: withinDay.length ? withinDay : later.slice(0, 3) };
+  const latestEnd = Math.max(...completed.map(session => session.end.getTime()));
+  const previous = completed.filter(session => session.end.getTime() === latestEnd);
+  return { active, next, previous, upcoming: withinDay.length ? withinDay : later.slice(0, 3) };
 }

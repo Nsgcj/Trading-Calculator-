@@ -37,7 +37,7 @@ Conservative slippage stress is shown separately. Models may miss gaps, stop rej
 2. Enter **CURRENT** equity, **CURRENT** failure floor, optional reserve, daily remaining loss limit and native quantity cap. Example $500 equity and $490 floor means only $10 raw buffer; the $500 is **not** the risk budget.
 3. Choose **Very Safe**, **Normal**, or **Risk the Biscuit** and optionally edit the exact drawdown fraction. Defaults: 2%, 5%, 60% of **usable drawdown**.
 4. Select instrument. Enter a real entry and the correct long/short *technical* invalidation stop, or its validated points/ticks/pips equivalent.
-5. Verify current broker multiplier, minimum lot/quantity, tick, quote currency/USD conversion rate, fees and spread. Pre-filled **Vest values are deliberately NOT verified**, and must be confirmed before use.
+5. Review the applied tick and order rules. Use the account’s quote currency conversion, fees and spread for any values the public contract feed does not supply.
 6. Review modeled native order size, dollar loss, expected reward, stress slippage and post-stop buffer. Only select trade if platform rules, margin and live risk gates also allow it. App is not an execution signal.
 
 ### Stops and targets from drawdown
@@ -48,7 +48,7 @@ Conservative slippage stress is shown separately. Models may miss gaps, stop rej
 
 ### Trade Planner
 
-Open **Trade Planner** for the Chicken Man execution windows, the broader 24-hour asset rotation, and exchange market hours. The execution view shows the current and next windows, the New York opening steps, and the midday pause on new entries. Use the references for per-asset windows, recurring events and the execution checklist. Times default to Eastern Time and the display zone can be changed without moving session hours. Select a linked asset to open it in the Risk Calculator with the current sizing account. Check exchange holidays, maintenance and broker-specific limits.
+Open **Trade Planner** for the Chicken Man execution windows, the broader 24-hour asset rotation, and exchange market hours. Each view shows the last completed session, the current window and what to prepare for next. Common setups include what to watch for and when to skip a play. The execution view follows the New York opening steps and midday pause on new entries. Times default to Eastern Time. Select a linked asset to open it in the Risk Calculator with the current sizing account.
 
 ### Automatic entry and exit levels
 
@@ -63,11 +63,11 @@ Open **Trade Planner** for the Chicken Man execution windows, the broader 24-hou
 - **Linear crypto perps:** BTC, ETH, and SOL templates for Hyperliquid, Binance USDⓈ-M, and Bybit USDT. Enter the venue's tick, size increment, minimum order, and quote-to-USD conversion. Verify the contract units. Inverse products need a different payoff model.
 
 - **CME futures:** ES ($50/point), MES ($5/point), NQ ($20/point), MNQ ($2/point), GC ($100/$1 gold move), MGC ($10/$1 gold move), MCL ($100/$1 oil move). Standard exchange contract sizes, not prop firm position limits or fees. Consult [CME contract info](https://www.cmegroup.com/markets/equities/sp-500-and-nasdaq-100-futures.html) and product-specific specs.
-- **Vest perpetuals:** NQ-PERP and ES-PERP have **illustrative** $1 / native unit / point multipliers and an illustrative 0.01 quantity increment. These are explicitly marked **unverified**. Confirm in the live platform. Vest instant profile equity $500 and failure floor $490 are **examples**, not a promise of current terms.
+- **Vest perpetuals:** NQ-PERP and ES-PERP load current order increments from Vest. The point value is 1 USDC per native unit per point. The $500 equity and $490 failure floor are example account values.
 - **Forex:** EURUSD uses 100k base units per standard lot and a USD quote; USDJPY requires the **current JPY→USD rate** and broker min lot setting. Beware 3-/5-digit broker 'pipette' pricing, and different instrument conventions.
 - **Crypto/Stocks/CFDs:** Configurable quote-unit multiplier, native unit step and min order. A USD-quoted crypto spot contract is NOT equal to a crypto perpetual or inverse contract.
 
-Data is **not** automatically updated. Contract specification status becomes unverified if manually edited. Account verification is a user self-attestation; not an API check. All risk modes are mathematical scenarios, not statistically validated presets.
+Published contract data is refreshed for supported venues. Manually edited contract rules require confirmation. Account verification is a user self-attestation. Risk modes are mathematical scenarios.
 
 ### Personal, evaluation, and funded profiles
 
@@ -79,9 +79,9 @@ The instrument dropdown shows the full catalog, grouped by platform and asset cl
 
 ### Contract specifications and execution costs
 
-- **Load exchange specification** retrieves published tick size, quantity rules, and minimum order value for supported Binance USDⓈ-M and Bybit USDT perpetuals. If the endpoint is unavailable, existing values are kept. Reload published rules after 24 hours. The quote-to-USD conversion remains an input.
+- Selecting supported Vest, Binance USDⓈ-M, or Bybit USDT perpetuals loads published tick and quantity rules automatically. Binance and Bybit also supply a minimum order value. Successful lookups are reused for up to 24 hours. Use **Load exchange specification** to refresh on demand. If the endpoint is unavailable, the desk uses existing values and marks expired rules for verification. Quote-to-USD conversion remains an input.
 - Enter total modeled slippage and any additional spread separately in ticks. Enter both sides of fees in USD per native unit. The ticket shows the estimated round-trip cost separately. Fee tiers, actual fills, funding, margin, liquidation, and prop account rules depend on the account and order.
-- Hyperliquid uses price-dependent precision. The fixed-tick calculator displays those contracts as estimates. Unverified Vest, FX, CFD and generic spot/share presets also depend on broker settings.
+- Hyperliquid uses price-dependent precision. The fixed-tick calculator displays those contracts as estimates. Generic FX, CFD and spot/share presets depend on broker settings. CME futures use published exchange ticks. When a position is too small to meet the venue’s quantity minimum, the ticket shows the risk of the minimum order alongside the selected budget.
 
 ### Published fees and daily limits
 

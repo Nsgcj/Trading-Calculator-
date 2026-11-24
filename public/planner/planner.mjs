@@ -1,6 +1,7 @@
 import { getSchedule, SCHEDULE_SOURCES } from '../schedule.mjs';
 import { getRotation, getMarketRotation } from '../rotation.mjs';
 import { ASSET_WINDOWS, TIMING_EVENTS, TIMING_SOURCES } from './rotation-reference.mjs';
+import { getSessionPlays, PLAY_SOURCES } from './session-plays.mjs';
 
 const clockZone = document.getElementById('planner-time-zone');
 const filterButtons = [...document.querySelectorAll('[data-asset]')];
@@ -92,6 +93,33 @@ function renderAssets(assets) {
   return list;
 }
 
+function appendSessionPlays(card, id, heading) {
+  const plays = getSessionPlays(id);
+  if (!plays.length) return;
+  const section = makeElement('div', '', 'session-plays');
+  const list = makeElement('ul');
+  for (const { name, watchFor, invalidatedBy } of plays) {
+    const item = makeElement('li');
+    const confirmation = makeElement('p');
+    confirmation.append(makeElement('strong', 'Watch for · '), watchFor);
+    const invalidation = makeElement('p');
+    invalidation.append(makeElement('strong', 'Skip if · '), invalidatedBy);
+    item.append(makeElement('h5', name), confirmation, invalidation);
+    list.append(item);
+  }
+  section.append(makeElement('h4', heading), list);
+  card.append(section);
+}
+
+function completedCard(session) {
+  const card = makeElement('article', '', 'completed-session');
+  const time = makeElement('time', sessionRange(session), 'session-time');
+  time.dateTime = session.end.toISOString();
+  card.append(makeElement('h3', session.name), time);
+  if (session.assets.length) card.append(renderAssets(session.assets));
+  return card;
+}
+
 function sessionCard(session, upcoming) {
   const card = makeElement('article', '', 'session-card');
   const head = makeElement('div', '', 'session-card-head');
@@ -104,6 +132,7 @@ function sessionCard(session, upcoming) {
   if (session.description) card.append(makeElement('p', session.description));
   if (session.assets.length) card.append(renderAssets(session.assets));
   if (upcoming && preparation[session.kind]) card.append(makeElement('p', preparation[session.kind]));
+  appendSessionPlays(card, session.id, upcoming ? 'Plays to prepare' : 'Session setup examples');
   return card;
 }
 
@@ -147,6 +176,9 @@ function rotationCard(window, upcoming) {
   if (window.secondaryAssets?.length) {
     card.append(makeElement('p', 'Secondary watchlist'), renderAssets(window.secondaryAssets));
   }
+  if (status === 'focus') {
+    appendSessionPlays(card, step?.name ?? window.playKey ?? window.id, upcoming ? 'Plays to prepare' : 'Plays to watch');
+  }
   return card;
 }
 
@@ -167,17 +199,18 @@ function renderOpeningSteps(opening, now) {
 
 function renderRotationView(now) {
   const isExecution = activeView === 'execution';
-  const { current, next, timeline } = isExecution ? getRotation(now) : getMarketRotation(now);
+  const { current, next, previous, timeline } = isExecution ? getRotation(now) : getMarketRotation(now);
   const visibleTimeline = timeline.filter(window => window.start.getTime() !== next?.start.getTime());
   document.getElementById('current-title').textContent = isExecution ? 'Execution now' : 'Rotation now';
   const opening = current?.steps?.length ? current : timeline.find(window => window.steps?.length);
   const upcomingStep = opening?.steps?.find(step => step.start > now);
   const showStep = isExecution && upcomingStep && (!next || upcomingStep.start <= next.start);
   document.getElementById('next-title').textContent = showStep ? 'Next opening step' : 'Next to prepare for';
-  const nextCard = showStep ? { ...upcomingStep, assets: opening.assets } : next;
+  const nextCard = showStep ? { ...upcomingStep, assets: opening.assets, playKey: upcomingStep.name } : next;
   document.getElementById('agenda-title').textContent = isExecution ? 'Later execution windows' : 'Later rotation windows';
   document.getElementById('current-count').textContent = '';
   document.getElementById('next-countdown').textContent = nextCard ? startsIn(nextCard.start, now) : '';
+  renderSection('previous-sessions', previous ? [previous] : [], completedCard, 'No completed session is available.');
   renderSection('current-sessions', current ? [current] : [], window => rotationCard(window, false), 'No execution window is active.');
   renderSection('next-sessions', nextCard ? [nextCard] : [], window => rotationCard(window, true), 'No upcoming window is shown.');
   renderSection('upcoming-sessions', showStep ? timeline : visibleTimeline, agendaCard, 'No additional windows in this view.');
@@ -189,9 +222,11 @@ function renderMarketView(now) {
   document.getElementById('current-title').textContent = 'Active markets';
   document.getElementById('next-title').textContent = 'Next market open';
   document.getElementById('agenda-title').textContent = 'Later market sessions';
-  const { active, next, upcoming } = getSchedule(now, { kind: activeFilter === allMarkets ? undefined : activeFilter });
+  const { active, next, previous, upcoming } = getSchedule(now, { kind: activeFilter === allMarkets ? undefined : activeFilter });
   document.getElementById('current-count').textContent = active.length ? `${active.length} active` : '';
   document.getElementById('next-countdown').textContent = next.length ? startsIn(next[0].start, now) : '';
+  const previousMessage = activeFilter === 'crypto' ? 'Spot crypto has no scheduled daily close.' : 'No completed session is available.';
+  renderSection('previous-sessions', previous, completedCard, previousMessage);
   renderSection('current-sessions', active, session => sessionCard(session, false), 'No scheduled session is active for this market.');
   const nextMessage = activeFilter === 'crypto' ? 'Crypto has no scheduled daily open.' : 'No scheduled open is shown for this market.';
   renderSection('next-sessions', next, session => sessionCard(session, true), nextMessage);
@@ -272,7 +307,7 @@ for (const button of filterButtons) {
 }
 
 const sources = document.getElementById('schedule-sources');
-const distinctSources = new Map([...SCHEDULE_SOURCES, ...TIMING_SOURCES].map(source => [source.url, source]));
+const distinctSources = new Map([...SCHEDULE_SOURCES, ...TIMING_SOURCES, ...PLAY_SOURCES].map(source => [source.url, source]));
 for (const source of distinctSources.values()) {
   const item = makeElement('li');
   const link = makeElement('a', source.label);

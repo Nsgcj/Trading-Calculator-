@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0c1320">
-  <meta name="description" content="Track current trading sessions and prepare watchlists for the next market window.">
+  <meta name="description" content="See the last completed trading session, current watchlist and setups for the next market window.">
   <title>CHICKEN MAN | Trade Planner</title>
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="../styles.css">
@@ -66,6 +66,11 @@
         </div>
       </fieldset>
 
+      <section class="panel planner-previous" aria-labelledby="previous-title">
+        <h2 id="previous-title">Last completed session</h2>
+        <div id="previous-sessions"></div>
+      </section>
+
       <div class="planner-grid">
         <section class="panel planner-current" aria-labelledby="current-title">
           <div class="planner-section-heading">
@@ -121,8 +126,9 @@
 
       <p class="planner-coverage">The execution and rotation windows follow your guide. Check your venue for holiday changes, maintenance, and account restrictions.</p>
       <details class="planner-sources">
-        <summary>Schedule sources and coverage</summary>
+        <summary>Schedule and setup sources</summary>
         <p>Execution and rotation windows come from your guide. Forex sessions are regional focus hours. Overseas cash sessions show regular hours and breaks. Holiday coverage varies by venue. Linked symbols open in the Risk Calculator.</p>
+        <p>The planner shows commonly taught setups. How often traders use each setup varies by market and session.</p>
         <ul id="schedule-sources"></ul>
       </details>
     </main>

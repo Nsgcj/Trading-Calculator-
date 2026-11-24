@@ -349,14 +349,19 @@ export function sizePosition(p) {
   const validTarget=price=>finitePositive(price) && direction*(entry-price)>0;
   const priceTarget=noTarget || budgetTarget?undefined:targetAt(distance*rr);
   const suggestedLevels=autoStop || autoTarget
-    ? {stop:noStop?undefined:stop,target:validTarget(priceTarget)?priceTarget:undefined,entry,stopMode:p.stopMode,targetMode:p.targetMode}
+    ? {stop:noStop?undefined:stop,target:validTarget(priceTarget)?priceTarget:undefined,entry,stopMode:p.stopMode,targetMode:p.targetMode,stopDistance:distance,stopTicks:distance/tick}
     : {};
   const minNotional=numeric(s.minNotionalQuote ?? 0);
   if (!finiteNonnegative(minNotional)) return blocked('Minimum order value must be nonnegative.');
   const lossPerUnit=distance*pointUSD+costsPerUnit;
   const qtyRisk=budgetStop?plannedQuantity:roundQuantityDown(budget/lossPerUnit,step);
   const qty=budgetStop || maxQ===null?qtyRisk:Math.min(qtyRisk,roundQuantityDown(maxQ,step));
-  if (qty+nearly<minQ) errors.push(`Minimum size ${minQ} ${s.unit} would exceed the risk allowance; skip the trade or use a smaller contract.`);
+  if (qty+nearly<minQ) {
+    const message = maxQ!==null && maxQ<minQ
+      ? 'The account quantity cap is below the venue minimum.'
+      : 'The venue’s smallest order exceeds this risk budget at the selected stop.';
+    errors.push(message);
+  }
   if (errors.length) return {status:'BLOCKED',warnings,errors,headroom:h,budget,...suggestedLevels,minimumUnitRisk:lossPerUnit*minQ};
   if (qty*entry*pointQuote<minNotional) return {...blocked('Order value at entry is below the entered venue minimum.'),...suggestedLevels};
   const risk=qty*lossPerUnit;

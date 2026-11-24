@@ -306,4 +306,7 @@ test('automatic exits derive long and short levels and retain them when the budg
   assert.equal(blocked.status, 'BLOCKED');
   assert.equal(blocked.stop, 24750);
   assert.equal(blocked.target, 25750);
+  assert.equal(blocked.stopTicks, 1000);
+  assert.equal(blocked.minimumUnitRisk, 2.5);
+  assert.equal(blocked.budget, 0.5);
 });
