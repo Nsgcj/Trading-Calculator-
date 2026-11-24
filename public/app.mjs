@@ -40,7 +40,6 @@ let currentResult=null,lastStopMode='price',quoteRequest,specRequest,entryQuote;
 function save(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));}catch{}}
 function selectedAccount(){return state.accounts.find(a=>a.id===state.accountId)||state.accounts[0];}
 function selectedInstrument(){return state.instruments.find(s=>s.id===state.instrumentId)??{};}
-function getApplicable(){return state.instruments.filter(s=>s.platform===selectedAccount().platform);}
 function fillAccounts(){
  const groups=new Map();
  for(const account of state.accounts){
@@ -57,22 +56,21 @@ function fillAccounts(){
  $('accountSelect').value=state.accountId;
 }
 const platformNames={
- vest:'Vest',futures:'Futures',custom:'Personal / FX',hyperliquid:'Hyperliquid',
  vest:'Vest','perp-custom':'Custom Perpetuals',futures:'Futures',custom:'Personal / FX',hyperliquid:'Hyperliquid',
  'binance-linear':'Binance USDⓈ-M','bybit-linear':'Bybit USDT',
 };
 function fillInstruments(restoreAccountChoice=false){
  const account=selectedAccount();
- const available=getApplicable();
  const preferred=restoreAccountChoice?account.instrumentId:state.instrumentId;
- const chosen=available.find(instrument=>instrument.id===preferred)
-  ?? available.find(instrument=>instrument.id===state.instrumentId)
-  ?? available[0];
+ const chosen=state.instruments.find(instrument=>instrument.id===preferred)
+  ?? state.instruments.find(instrument=>instrument.id===state.instrumentId)
+  ?? state.instruments[0];
  state.instrumentId=chosen?.id??'';
  account.instrumentId=state.instrumentId;
  const groups=new Map();
+ const samePlatform=state.instruments.filter(instrument=>instrument.platform===account.platform);
  const otherInstruments=state.instruments.filter(instrument=>instrument.platform!==account.platform);
- for(const instrument of [...available,...otherInstruments]){
+ for(const instrument of [...samePlatform,...otherInstruments]){
   const platform=platformNames[instrument.platform]??instrument.platform;
   const label=`${platform} · ${instrument.asset||'Other'}`;
   if(!groups.has(label)){
@@ -84,7 +82,7 @@ function fillInstruments(restoreAccountChoice=false){
  }
  $('instrumentSelect').replaceChildren(...groups.values());
  $('instrumentSelect').value=state.instrumentId;
- $('instrumentAccount').textContent=`Sizing account: ${account.name}. Choosing a contract on another platform switches accounts.`;
+ $('instrumentAccount').textContent=`Sizing account: ${account.name}.`;
 }
 const nextStage={evaluation:'sim-funded','sim-funded':'live-funded'};
 function showReference(id, url){
@@ -452,18 +450,6 @@ function init(){
  $('instrumentSelect').addEventListener('change',()=>{
   const instrument=state.instruments.find(item=>item.id===$('instrumentSelect').value);
   if(!instrument) return;
-  if(instrument.platform!==selectedAccount().platform){
-   const accounts=state.accounts.filter(account=>account.platform===instrument.platform);
-   const account=accounts.find(item=>item.instrumentId===instrument.id)??accounts[0];
-   if(!account){
-    fillInstruments();
-    $('instrumentAccount').textContent='Create an account profile for this platform to size this instrument.';
-    return;
-   }
-   state.accountId=account.id;
-   fillAccounts();
-   syncAccountFields();
-  }
   state.instrumentId=instrument.id;
   fillInstruments();
   syncSpecFields();save();refresh();
@@ -527,7 +513,7 @@ function init(){
  $('saveInstrumentBtn').addEventListener('click',()=>{
   const symbol=$('newInstrumentSymbol').value.trim().toUpperCase().replace(/[^A-Z0-9._-]/g,'').slice(0,24),name=$('newInstrumentName').value.trim();
   if(!symbol||!name){(!symbol?$('newInstrumentSymbol'):$('newInstrumentName')).focus();return;}
-  const id='instrument-'+Date.now(),s={...clone(selectedInstrument()),id,symbol,name,platform:selectedAccount().platform,verified:false,source:'Custom instrument — verify contract size, min step and currency conversion'};
+  const id='instrument-'+Date.now(),s={...clone(selectedInstrument()),id,symbol,name,verified:false,source:'Custom instrument — verify contract size, min step and currency conversion'};
   delete s.lookupAt;
   delete s.sourceUrl;
   state.instruments.push(s);state.instrumentId=id;fillInstruments();syncSpecFields();$('newInstrumentPanel').hidden=true;save();refresh();

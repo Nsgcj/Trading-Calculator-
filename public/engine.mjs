@@ -279,7 +279,7 @@ export function sizePosition(p) {
   const assumedMovePercent=numeric(p.assumedMovePercent);
   const tick=numeric(s.tickSize), pointQuote=numeric(s.pointValueQuote), fx=numeric(s.quoteToUSD), step=numeric(s.quantityStep), minQ=numeric(s.minQuantity);
   const slip=numeric(p.slippageTicks ?? 0), spread=numeric(p.spreadTicks ?? 0), fees=numeric(p.feePerUnit ?? 0), stressExtra=numeric(p.stressExtraTicks ?? 2);
-  if (a.platform && s.platform && a.platform!==s.platform) errors.push('Choose an instrument available for the selected account platform.');
+  const differentPlatform=Boolean(a.platform && s.platform && a.platform!==s.platform);
   if (!h) errors.push('Enter valid account equity, failure floor and safety reserve.');
   else if (h.raw <= 0) errors.push('Account equity is at/below the failure floor. No trade.');
   else if (h.usable <= 0) errors.push('No usable drawdown remains after the safety reserve.');
@@ -366,12 +366,13 @@ export function sizePosition(p) {
   if (!a.verified) warnings.push('Account floor and drawdown rules are not confirmed. Enter the live broker floor before trading.');
   const specCurrent=s.verified && (!s.lookupAt || Date.now()-s.lookupAt<86400000) && s.platform!=='hyperliquid';
   if (s.platform==='hyperliquid') warnings.push('Hyperliquid price precision changes with price and asset. The entered fixed tick is an estimate.');
+  if (differentPlatform) warnings.push('Check that your account offers this instrument and uses the displayed contract units and position limits.');
   if (!specCurrent) warnings.push('Instrument unit/lot/contract specification NOT verified. Confirm the platform specification.');
   if (fees===0) warnings.push('Modeled commission is $0. Estimated costs can differ from actual execution.');
   if (stressRisk > h.usable + nearly) warnings.push('Stress slippage could penetrate the safety reserve / failure floor.');
   if (riskFraction>=0.25) warnings.push('High-risk mode: one adverse move could consume a large share of available drawdown.');
   if (!a.noDailyLimit && a.stage!=='personal' && (a.dailyRemaining==null || a.dailyRemaining==='')) warnings.push('Sizing uses remaining drawdown. Enter any separate daily loss allowance from your plan.');
-  const verified=Boolean(a.verified && specCurrent);
+  const verified=Boolean(a.verified && specCurrent && !differentPlatform);
   return {
     status:verified?'CALCULATED':'VERIFY',warnings,errors,headroom:h,budget,
     quantity:qty,risk,expectedReward:reward,rrNet:noTarget?undefined:reward/risk,

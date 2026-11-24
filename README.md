@@ -71,7 +71,7 @@ Use the **Account profile** dropdown to choose a personal broker, evaluation, si
 
 ### Finding an instrument
 
-The instrument dropdown shows the full catalog, grouped by platform and asset class. The current account's instruments appear first. Choosing a contract on another platform switches to a compatible saved account and recalculates the budget from that account's inputs. Your saved custom instruments remain in the dropdown.
+The instrument dropdown shows the full catalog, grouped by platform and asset class. Instruments in the selected account's default platform group appear first. Selecting any instrument keeps your sizing account and its risk limits. When the instrument comes from another platform group, the result is marked for verification so you can check broker availability and contract units. Your saved custom instruments remain in the dropdown.
 
 ### Contract specifications and execution costs
 
