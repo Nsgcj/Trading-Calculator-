@@ -4,6 +4,6 @@
   "private": true,
   "type": "module",
   "description": "Risk-first multi-asset contract sizing calculator",
-  "scripts": {"test": "node --test tests/*.test.mjs", "start": "npx serve public", "check": "node --check public/engine.mjs && node --check public/app.mjs && node --check public/quotes.mjs && node --check public/contract-specs.mjs && node --check public/account-references.mjs && node --check netlify/functions/vest-quote.mjs && node --check public/schedule.mjs && node --check public/planner/planner.mjs && npm test"},
+  "scripts": {"test": "node --test tests/*.test.mjs", "start": "npx serve public", "check": "node --check public/engine.mjs && node --check public/app.mjs && node --check public/quotes.mjs && node --check public/contract-specs.mjs && node --check public/account-references.mjs && node --check netlify/functions/vest-quote.mjs && node --check public/schedule.mjs && node --check public/rotation.mjs && node --check public/planner/rotation-reference.mjs && node --check public/planner/planner.mjs && npm test"},
   "engines": {"node": ">=20"}
 }

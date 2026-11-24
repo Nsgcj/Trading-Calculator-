@@ -263,3 +263,67 @@
     gap: 6px 12px;
   }
 }
+
+.rotation-status[data-status="prepare"],
+.rotation-status[data-status="manage"],
+.rotation-status[data-status="off"] {
+  color: var(--amber);
+}
+.session-assets .asset-reference {
+  display: block;
+  padding: 5px 8px;
+  border: 1px solid #2e4256;
+  border-radius: 5px;
+  color: #c6d3df;
+  font-size: 12px;
+}
+.session-card .current-phase {
+  margin-top: 10px;
+  padding: 7px 9px;
+  border-left: 2px solid #4f8a78;
+  background: #142831;
+  color: #d2e7ea;
+}
+.session-timeline article[aria-current="true"] {
+  border-left-color: var(--teal);
+  background: #172e32;
+}
+.planner-references {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+.planner-references details {
+  padding: 14px 18px;
+  min-width: 0;
+}
+.planner-references summary {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 720;
+}
+.planner-references p,
+.planner-references ol {
+  color: var(--sub);
+  font-size: 13px;
+  line-height: 1.65;
+}
+.planner-references li + li {
+  margin-top: 6px;
+}
+.planner-references label {
+  display: block;
+  margin-bottom: 5px;
+}
+.planner-references input {
+  width: min(100%, 360px);
+}
+.planner-references h3 {
+  margin: 18px 0 6px;
+  font-size: 14px;
+}
+.planner-references td {
+  white-space: normal;
+  min-width: 120px;
+  vertical-align: top;
+}

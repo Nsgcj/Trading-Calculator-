@@ -1,9 +1,13 @@
 import { getSchedule, SCHEDULE_SOURCES } from '../schedule.mjs';
+import { getRotation, getMarketRotation } from '../rotation.mjs';
+import { ASSET_WINDOWS, TIMING_EVENTS, TIMING_SOURCES } from './rotation-reference.mjs';
 
 const clockZone = document.getElementById('planner-time-zone');
 const filterButtons = [...document.querySelectorAll('[data-asset]')];
+const viewButtons = [...document.querySelectorAll('[data-view]')];
 const allMarkets = 'all';
 let activeFilter = allMarkets;
+let activeView = 'execution';
 let lastMinute;
 let dateFormat;
 let clockFormat;
@@ -72,11 +76,17 @@ function renderAssets(assets) {
   const list = makeElement('ul', '', 'session-assets');
   list.setAttribute('aria-label', 'Assets to watch');
   for (const asset of assets) {
-    const link = makeElement('a', asset.symbol);
-    link.href = `../?instrument=${encodeURIComponent(asset.id)}`;
-    link.title = `${asset.name} in Risk Calculator`;
     const item = makeElement('li');
-    item.append(link);
+    if (asset.id) {
+      const link = makeElement('a', asset.symbol);
+      link.href = `../?instrument=${encodeURIComponent(asset.id)}`;
+      link.title = `${asset.name} in Risk Calculator`;
+      item.append(link);
+    } else {
+      const label = makeElement('span', asset.symbol, 'asset-reference');
+      label.title = asset.name;
+      item.append(label);
+    }
     list.append(item);
   }
   return list;
@@ -89,6 +99,7 @@ function sessionCard(session, upcoming) {
   const time = makeElement('time', sessionRange(session), 'session-time');
   if (!session.continuous) time.dateTime = session.start.toISOString();
   card.append(head, time);
+  if (session.regularOnly) card.append(makeElement('p', 'Regular hours · holiday exceptions may apply.'));
   if (session.earlyClose) card.append(makeElement('p', 'Scheduled early close.', 'session-adjustment'));
   if (session.description) card.append(makeElement('p', session.description));
   if (session.assets.length) card.append(renderAssets(session.assets));
@@ -111,15 +122,73 @@ function renderSection(id, sessions, renderer, empty) {
   container.replaceChildren(...children);
 }
 
-function update(now = new Date(), force = false) {
-  const minute = Math.floor(now.getTime() / 60_000);
-  const date = document.getElementById('planner-date');
-  const time = document.getElementById('planner-time');
-  date.textContent = dateFormat.format(now);
-  time.textContent = clockFormat.format(now);
-  date.dateTime = time.dateTime = now.toISOString();
-  if (!force && minute === lastMinute) return;
-  lastMinute = minute;
+const rotationStatus = {
+  focus: 'Watch for confirmed entries',
+  prepare: 'Prepare · no new entries',
+  manage: 'Manage · no new entries',
+  off: 'No new entries',
+};
+
+function rotationCard(window, upcoming) {
+  const card = makeElement('article', '', 'session-card');
+  const step = upcoming ? null : window.phase;
+  const status = step?.status ?? window.status;
+  const label = activeView==='rotation' && status==='manage' ? 'Position management' : rotationStatus[status];
+  const badge = makeElement('span', label, 'session-kind rotation-status');
+  badge.dataset.status = status;
+  const head = makeElement('div', '', 'session-card-head');
+  head.append(makeElement('h3', window.name), badge);
+  const time = makeElement('time', sessionRange(window), 'session-time');
+  time.dateTime = window.start.toISOString();
+  card.append(head, time);
+  if (window.description) card.append(makeElement('p', window.description));
+  if (step) card.append(makeElement('p', `${step.name} · ${step.description}`, 'current-phase'));
+  if (window.assets.length) card.append(renderAssets(window.assets));
+  if (window.secondaryAssets?.length) {
+    card.append(makeElement('p', 'Secondary watchlist'), renderAssets(window.secondaryAssets));
+  }
+  return card;
+}
+
+function renderOpeningSteps(opening, now) {
+  const panel = document.getElementById('opening-plan');
+  panel.hidden = !opening?.steps?.length;
+  if (panel.hidden) return;
+  const entries = opening.steps.map(step => {
+    const item = makeElement('article');
+    if (step.start <= now && now < step.end) item.setAttribute('aria-current', 'true');
+    const time = makeElement('time', sessionRange(step));
+    time.dateTime = step.start.toISOString();
+    item.append(time, makeElement('h3', step.name), makeElement('p', step.description, 'session-empty'));
+    return item;
+  });
+  document.getElementById('opening-steps').replaceChildren(...entries);
+}
+
+function renderRotationView(now) {
+  const isExecution = activeView === 'execution';
+  const { current, next, timeline } = isExecution ? getRotation(now) : getMarketRotation(now);
+  const visibleTimeline = timeline.filter(window => window.start.getTime() !== next?.start.getTime());
+  document.getElementById('current-title').textContent = isExecution ? 'Execution now' : 'Rotation now';
+  const opening = current?.steps?.length ? current : timeline.find(window => window.steps?.length);
+  const upcomingStep = opening?.steps?.find(step => step.start > now);
+  const showStep = isExecution && upcomingStep && (!next || upcomingStep.start <= next.start);
+  document.getElementById('next-title').textContent = showStep ? 'Next opening step' : 'Next to prepare for';
+  const nextCard = showStep ? { ...upcomingStep, assets: opening.assets } : next;
+  document.getElementById('agenda-title').textContent = isExecution ? 'Later execution windows' : 'Later rotation windows';
+  document.getElementById('current-count').textContent = '';
+  document.getElementById('next-countdown').textContent = nextCard ? startsIn(nextCard.start, now) : '';
+  renderSection('current-sessions', current ? [current] : [], window => rotationCard(window, false), 'No execution window is active.');
+  renderSection('next-sessions', nextCard ? [nextCard] : [], window => rotationCard(window, true), 'No upcoming window is shown.');
+  renderSection('upcoming-sessions', showStep ? timeline : visibleTimeline, agendaCard, 'No additional windows in this view.');
+  renderOpeningSteps(isExecution ? opening : null, now);
+}
+
+function renderMarketView(now) {
+  document.getElementById('opening-plan').hidden = true;
+  document.getElementById('current-title').textContent = 'Active markets';
+  document.getElementById('next-title').textContent = 'Next market open';
+  document.getElementById('agenda-title').textContent = 'Later market sessions';
   const { active, next, upcoming } = getSchedule(now, { kind: activeFilter === allMarkets ? undefined : activeFilter });
   document.getElementById('current-count').textContent = active.length ? `${active.length} active` : '';
   document.getElementById('next-countdown').textContent = next.length ? startsIn(next[0].start, now) : '';
@@ -130,10 +199,69 @@ function update(now = new Date(), force = false) {
   renderSection('upcoming-sessions', later, agendaCard, activeFilter === 'crypto' ? nextMessage : 'No additional sessions in this window.');
 }
 
+function makeTable(label, headings, rows) {
+  const table = makeElement('table');
+  table.setAttribute('aria-label', label);
+  const head = table.createTHead().insertRow();
+  for (const heading of headings) {
+    const header = makeElement('th', heading);
+    header.scope = 'col';
+    head.append(header);
+  }
+  const body = table.createTBody();
+  for (const columns of rows) {
+    const row = body.insertRow();
+    for (const value of columns) row.insertCell().textContent = value || '—';
+  }
+  return table;
+}
+
+const search = document.getElementById('asset-window-search');
+const searchKey = value => value.toLowerCase().replace(/[^a-z0-9]/g, '');
+function renderAssetWindows() {
+  const query = searchKey(search.value);
+  const tables = [];
+  for (const { category, rows } of ASSET_WINDOWS) {
+    const matches = rows.filter(row => searchKey(row.asset).includes(query) || searchKey(category).includes(query));
+    if (!matches.length) continue;
+    const wrap = makeElement('div', '', 'table-wrap');
+    wrap.append(makeTable(category, ['Asset', 'Primary window', 'Secondary window'], matches.map(row => [row.asset, row.primary, row.secondary])));
+    tables.push(makeElement('h3', category), wrap);
+  }
+  document.getElementById('asset-window-tables').replaceChildren(...(tables.length ? tables : [makeElement('p', 'No matching asset windows.')]));
+}
+search.addEventListener('input', renderAssetWindows);
+renderAssetWindows();
+document.getElementById('timing-events').append(makeTable('Institutional timing events', ['Time', 'Event', 'Assets', 'Conditions'],
+  TIMING_EVENTS.map(item => [item.time, item.event, item.assets, item.note]),
+));
+
+function update(now = new Date(), force = false) {
+  const minute = Math.floor(now.getTime() / 60_000);
+  const date = document.getElementById('planner-date');
+  const time = document.getElementById('planner-time');
+  date.textContent = dateFormat.format(now);
+  time.textContent = clockFormat.format(now);
+  date.dateTime = time.dateTime = now.toISOString();
+  if (!force && minute === lastMinute) return;
+  lastMinute = minute;
+  if (activeView === 'markets') renderMarketView(now);
+  else renderRotationView(now);
+}
+
 clockZone.addEventListener('change', () => {
   configureFormatters();
   update(new Date(), true);
 });
+
+for (const button of viewButtons) {
+  button.addEventListener('click', () => {
+    activeView = button.dataset.view;
+    for (const candidate of viewButtons) candidate.setAttribute('aria-pressed', String(candidate === button));
+    document.getElementById('market-filters').hidden = activeView !== 'markets';
+    update(new Date(), true);
+  });
+}
 
 for (const button of filterButtons) {
   button.addEventListener('click', () => {
@@ -144,7 +272,8 @@ for (const button of filterButtons) {
 }
 
 const sources = document.getElementById('schedule-sources');
-for (const source of SCHEDULE_SOURCES) {
+const distinctSources = new Map([...SCHEDULE_SOURCES, ...TIMING_SOURCES].map(source => [source.url, source]));
+for (const source of distinctSources.values()) {
   const item = makeElement('li');
   const link = makeElement('a', source.label);
   link.href = source.url;
