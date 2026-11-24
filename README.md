@@ -50,7 +50,7 @@ Conservative slippage stress is shown separately. Models may miss gaps, stop rej
 
 - Uncheck **Use manual stop-loss** or leave its input blank for an automatic stop. The default is a 1% adverse move from entry, adjusted to the instrument’s tick. Change the distance if you need a different scenario.
 - Uncheck **Customize take-profit** or leave its multiple blank for a target based on three times the stop distance. Valid manual inputs still apply.
-- With a missing entry or automatic exit, the desk fetches a quote snapshot for Vest NQ and ES perpetuals or the supported Coinbase spot and Hyperliquid perpetual instruments. **Use current price** refreshes the snapshot. For an unavailable market or feed, enter the quote from your broker. Suggested levels are for planning, and no orders are submitted.
+- Before you enter a price, the desk fetches the most recent public price for Vest NQ and ES perpetuals and supported Coinbase spot and Hyperliquid perpetual instruments. The source and available timestamp appear beside the entry. Older Vest or Coinbase trades are labeled as last known. **Refresh public price** reloads the quote. If a feed is unavailable, enter the price from your broker. Use **Copy SL** or **Copy TP** on the position ticket to copy the individual price as a plain number.
 
 ### Instrument presets
 

@@ -1,13 +1,7 @@
-const spotProducts = new Map([
-  ['c-btc', 'BTC'],
-  ['c-eth', 'ETH'],
-  ['c-sol', 'SOL'],
-]);
-const hyperliquidPerps = new Map([
-  ['hyperliquid-btc', 'BTC'],
-  ['hyperliquid-eth', 'ETH'],
-  ['hyperliquid-sol', 'SOL'],
-]);
+const cryptoMarkets = ['BTC', 'ETH', 'SOL', 'XRP', 'DOGE', 'ADA', 'LINK', 'AVAX', 'SUI'];
+const spotProducts = new Map(cryptoMarkets.map(coin => [`c-${coin.toLowerCase()}`, coin]));
+const hyperliquidPerps = new Map(cryptoMarkets.map(coin => [`hyperliquid-${coin.toLowerCase()}`, coin]));
+const freshWindowMs = 120_000;
 const vestPerps = new Map([
   ['vest-nq', 'NQ'],
   ['vest-es', 'ES'],
@@ -61,18 +55,17 @@ export async function getCurrentPrice(instrument, { signal } = {}) {
   const price = typeof rawPrice === 'string' || typeof rawPrice === 'number' ? Number(rawPrice) : NaN;
   if (!Number.isFinite(price) || price <= 0) throw new Error('Price feed did not return a usable price.');
 
-  if (isVest) {
-    const age = Date.now() - data.time;
-    if (!Number.isSafeInteger(data.time) || age < -5000 || age > 120000) {
-      throw new Error('Vest Markets did not return a recent trade. Enter the price from your platform.');
+  if (isSpot || isVest) {
+    const time = isSpot && typeof data.time === 'string' ? Date.parse(data.time) : data.time;
+    const age = Date.now() - time;
+    if (!Number.isSafeInteger(time) || time <= 0 || age < -5000) {
+      throw new Error('Price feed did not return a valid trade time. Enter the price from your platform.');
     }
-    return { price, source: `Vest Markets ${coin} perpetual last trade (USDC)`, time: data.time };
+    const source = isVest
+      ? `Vest Markets ${coin} perpetual last trade (USDC)`
+      : `Coinbase ${coin}-USD last trade`;
+    return { price, source, time, lastKnown: data.lastKnown === true || age > freshWindowMs };
   }
 
-  return {
-    price,
-    source: isSpot
-      ? `Coinbase ${coin}-USD last trade`
-      : `Hyperliquid ${coin} perpetual midpoint`,
-  };
+  return { price, source: `Hyperliquid ${coin} perpetual midpoint` };
 }

@@ -3,7 +3,7 @@ const markets = new Map([
   ['es', { label: 'ES', symbol: 'SPX-USD-PERP' }],
 ]);
 const venueOrigin = 'https://api-gateway.hz.vestmarkets.com';
-const maxAgeMs = 120_000;
+const freshWindowMs = 120_000;
 
 function reply(body, status, headers = {}) {
   return Response.json(body, { status, headers: { 'Cache-Control': 'no-store', ...headers } });
@@ -34,23 +34,27 @@ export default async function handler(request) {
     const ticker = Array.isArray(statusData?.tickers) && statusData.tickers.length === 1
       ? statusData.tickers[0]
       : null;
-    if (ticker?.symbol !== market.symbol || ticker.status !== 'TRADING') {
-      return reply({ error: 'Vest Markets has no active quote for this market.' }, 503);
+    if (ticker?.symbol !== market.symbol || typeof ticker.status !== 'string' || !ticker.status.trim()) {
+      return reply({ error: 'Vest Markets returned an invalid market status.' }, 502);
     }
 
     const trade = Array.isArray(tradeData) && tradeData.length === 1 ? tradeData[0] : null;
     const rawPrice = trade?.price;
     const price = typeof rawPrice === 'string' || typeof rawPrice === 'number' ? Number(rawPrice) : NaN;
     const time = trade?.time;
-    if (!Number.isFinite(price) || price <= 0 || !Number.isSafeInteger(time)) {
+    if (!Number.isFinite(price) || price <= 0 || !Number.isSafeInteger(time) || time <= 0) {
       return reply({ error: 'Vest Markets returned an invalid trade.' }, 502);
     }
     const age = Date.now() - time;
-    if (age < -5_000 || age > maxAgeMs) {
-      return reply({ error: 'Vest Markets has no recent trade for this market.' }, 503);
+    if (age < -5_000) {
+      return reply({ error: 'Vest Markets returned a future trade time.' }, 502);
     }
 
-    return reply({ price, time, source: `Vest Markets ${market.label} perpetual last trade (USDC)` }, 200);
+    return reply({
+      price, time,
+      source: `Vest Markets ${market.label} perpetual last trade (USDC)`,
+      lastKnown: ticker.status !== 'TRADING' || age > freshWindowMs,
+    }, 200);
   } catch {
     return reply({ error: 'Vest Markets quote unavailable.' }, 502);
   }

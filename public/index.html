@@ -68,11 +68,11 @@
             <div class="check-row"><input id="useStop" type="checkbox" checked /><label for="useStop">Use manual stop-loss</label></div>
             <div class="check-row"><input id="useTarget" type="checkbox" checked /><label for="useTarget">Customize take-profit</label></div>
           </div>
-          <div class="field-row"><div class="field"><label for="entry">Entry price</label><input type="number" id="entry" value="25000" step="any" inputmode="decimal" aria-describedby="quoteStatus" /><button type="button" id="currentPrice" class="link-button">Use current price</button></div><div class="field" id="stopModeField"><label for="stopMode">Stop expressed as</label><select id="stopMode"><option value="price">Actual stop price</option><option value="points">Points / price movement</option><option value="ticks">Ticks</option><option value="pips">Pips (FX only)</option><option value="budget">From drawdown budget</option></select></div></div>
+          <div class="field-row"><div class="field"><label for="entry">Entry price</label><input type="number" id="entry" step="any" inputmode="decimal" aria-describedby="quoteStatus" /><button type="button" id="currentPrice" class="link-button">Refresh public price</button></div><div class="field" id="stopModeField"><label for="stopMode">Stop expressed as</label><select id="stopMode"><option value="price">Actual stop price</option><option value="points">Points / price movement</option><option value="ticks">Ticks</option><option value="pips">Pips (FX only)</option><option value="budget">From drawdown budget</option></select></div></div>
           <p class="micro-note" id="quoteStatus" role="status"></p>
           <div class="field-row">
             <div class="field" id="assumedMoveField" hidden><label for="assumedMove">Automatic stop distance (%)</label><input id="assumedMove" type="number" min="0.01" max="99.99" step="any" value="1" inputmode="decimal" aria-describedby="scenarioHelp" /></div>
-            <div class="field" id="manualStopField"><label for="stopInput" id="stopLabel">Structural stop price</label><input type="number" id="stopInput" value="24970" step="any" inputmode="decimal" /></div>
+            <div class="field" id="manualStopField"><label for="stopInput" id="stopLabel">Structural stop price</label><input type="number" id="stopInput" step="any" inputmode="decimal" /></div>
             <div class="field" id="plannedQuantityField" hidden><label for="plannedQuantity">Planned quantity <span id="plannedQuantityUnit"></span></label><input type="number" id="plannedQuantity" min="0" step="any" inputmode="decimal" aria-describedby="budgetStopNote" /></div>
             <div class="field" id="targetModeField"><label for="targetMode">Take-profit method</label><select id="targetMode"><option value="stop">From stop distance</option><option value="budget">From drawdown budget</option></select></div>
           </div>
@@ -114,14 +114,15 @@
             <div class="ticket-line"><span id="lossLabel">Planned stop loss</span><b class="red" id="actualRisk">—</b></div>
             <div class="ticket-line"><span>Target net profit <small>(model)</small></span><b class="teal" id="targetProfit">—</b></div>
             <div class="ticket-line"><span>Effective net R : R</span><b id="effectiveRR">—</b></div>
-            <div class="ticket-line"><span id="stopPriceLabel">Stop-loss price</span><b id="stopPrice">—</b></div>
-            <div class="ticket-line"><span id="targetPriceLabel">Take-profit price</span><b id="targetPrice">—</b></div>
+            <div class="ticket-line"><span id="stopPriceLabel">Stop-loss price</span><span class="level-actions"><b id="stopPrice">—</b><button type="button" id="copyStopPrice" class="level-copy" aria-label="Copy stop-loss price" disabled>Copy SL</button></span></div>
+            <div class="ticket-line"><span id="targetPriceLabel">Take-profit price</span><span class="level-actions"><b id="targetPrice">—</b><button type="button" id="copyTargetPrice" class="level-copy" aria-label="Copy take-profit price" disabled>Copy TP</button></span></div>
             <div class="ticket-line"><span id="widthLabel">Stop width</span><b id="stopWidth">—</b></div>
             <div class="ticket-line"><span>Estimated round-trip costs</span><b id="estimatedCosts">—</b></div>
             <div class="ticket-line"><span>Unused risk budget</span><b id="allocationUsed">—</b></div>
             <div class="ticket-line"><span>Estimated exposure <small>USD</small></span><b id="notional">—</b></div>
             <div class="ticket-line"><span>Extra-slip stress loss</span><b id="stressRisk">—</b></div>
           </div>
+          <p class="micro-note" id="copyLevelStatus" role="status" hidden></p>
           <div class="status-message" id="statusMessage" role="status">Waiting for validated trade details.</div>
           <div class="warning-list" id="warningList" aria-live="polite"></div>
           <button type="button" id="copyBtn" class="copy-button" disabled>Copy position plan <span>↗</span></button>
