@@ -38,6 +38,9 @@ export default async function handler(request) {
     // The Vest API defines the increment and minimum size as 10 ^ -sizeDecimals.
     // https://docs.vest.exchange/vest-api
     const quantityStep = Number(`1e-${spec.sizeDecimals}`);
+    const fee = spec.takerFee;
+    const takerFeeRate = typeof fee === 'number' || (typeof fee === 'string' && fee.trim()) ? Number(fee) : NaN;
+    const hasTakerFeeRate = Number.isFinite(takerFeeRate) && takerFeeRate >= 0 && takerFeeRate < 1;
     // Vest's ES and NQ sizing guide confirms the 1 USDC point value per native unit.
     // https://docs.vestmarkets.com/trading/cross-margin-and-leverage#sizing-for-futures-traders-micro-and-e-mini-equivalents
     return reply({
@@ -46,6 +49,7 @@ export default async function handler(request) {
       quantityStep,
       minQuantity: quantityStep,
       pointValueQuote: 1,
+      ...(hasTakerFeeRate ? { takerFeeRate } : {}),
       source: `Vest Markets Exchange Info and contract sizing guide (${spec.displaySymbol}, USDC)`,
     }, 200);
   } catch {

@@ -54,6 +54,8 @@ Select **Browse playbooks** for the detailed session guides, including preparati
 
 Use **Hedge Sizer** to model a partial offset for long or short equity exposure with ES, MES, NQ, or MNQ. It compares rising, flat, and falling benchmark scenarios after entered costs and can size toward an optional dollar protection target within the entered loss, position, margin, and coverage limits. Week-end and month-end dates use scheduled U.S. cash closes. Verify your futures contract’s last trading date, overnight permissions, and margin for the holding period.
 
+The **Vest Perpetuals** hedge mode uses a currently held quantity in NQ-PERP or ES-PERP. It fetches Vest’s last public price, tick, and quantity rules, and sizes an opposite position in fractional Vest units from the hedge account’s equity, failure floor, any separate limits, and selected risk fraction. Enter moves in index points and review fees, slippage, and funding for the intended holding period. Margin, leverage, and liquidation apply to each Vest account separately. [Vest Capital terms](https://next.vestmarkets.com/prop-terms-of-service)
+
 Use **Hedge Review** for an existing hedge. Enter your chart invalidation level and last completed close. Review alerts progress from proximity to a break and then confirmed follow-through. The risk check protects the higher of peak equity minus allowed giveback and the firm floor plus reserve. It models the smallest trim that fits the entered adverse move and exit costs. Each account keeps its own drawdown room. Review results use fresh manual inputs each time.
 
 ### Automatic entry and exit levels
