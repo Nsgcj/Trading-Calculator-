@@ -2,6 +2,7 @@ import { getSchedule, SCHEDULE_SOURCES } from '../schedule.mjs';
 import { getRotation, getMarketRotation } from '../rotation.mjs';
 import { ASSET_WINDOWS, TIMING_EVENTS, TIMING_SOURCES } from './rotation-reference.mjs';
 import { getSessionPlays, PLAY_SOURCES } from './session-plays.mjs';
+import { MARKET_MEMORY_PLAYBOOKS } from './market-memory.mjs';
 
 const clockZone = document.getElementById('planner-time-zone');
 const filterButtons = [...document.querySelectorAll('[data-asset]')];
@@ -93,6 +94,41 @@ function renderAssets(assets) {
   return list;
 }
 
+const memoryViews = MARKET_MEMORY_PLAYBOOKS.map(({ id, label, description, steps }) => {
+  const button = makeElement('button', label);
+  button.type = 'button';
+  button.setAttribute('aria-controls', `memory-${id}`);
+  button.addEventListener('click', () => selectMemoryView(id));
+  const panel = makeElement('div');
+  panel.id = `memory-${id}`;
+  const list = makeElement('ol', '', 'memory-steps');
+  for (const { title, body } of steps) {
+    const step = makeElement('li');
+    step.append(makeElement('h3', title), makeElement('p', body));
+    list.append(step);
+  }
+  panel.append(makeElement('p', description, 'memory-description'), list);
+  return { id, button, panel };
+});
+
+function selectMemoryView(id) {
+  for (const view of memoryViews) {
+    view.button.setAttribute('aria-pressed', String(view.id === id));
+    view.panel.hidden = view.id !== id;
+  }
+}
+
+document.getElementById('memory-timeframes').append(...memoryViews.map(view => view.button));
+document.getElementById('memory-playbooks').append(...memoryViews.map(view => view.panel));
+selectMemoryView('daily');
+
+function memoryLink(text) {
+  const link = makeElement('a', text, 'memory-link');
+  link.href = '#market-memory';
+  link.addEventListener('click', () => selectMemoryView('session'));
+  return link;
+}
+
 function appendSessionPlays(card, id, heading) {
   const plays = getSessionPlays(id);
   if (!plays.length) return;
@@ -108,6 +144,7 @@ function appendSessionPlays(card, id, heading) {
     list.append(item);
   }
   section.append(makeElement('h4', heading), list);
+  if (plays.some(play => play.marketMemory)) section.append(memoryLink('Open Market Memory playbook'));
   card.append(section);
 }
 
@@ -133,6 +170,7 @@ function sessionCard(session, upcoming) {
   if (session.assets.length) card.append(renderAssets(session.assets));
   if (upcoming && preparation[session.kind]) card.append(makeElement('p', preparation[session.kind]));
   appendSessionPlays(card, session.id, upcoming ? 'Plays to prepare' : 'Session setup examples');
+  if (session.id === 'us-equities') card.append(memoryLink('Day Two · U.S. stock session playbook'));
   return card;
 }
 
@@ -176,8 +214,12 @@ function rotationCard(window, upcoming) {
   if (window.secondaryAssets?.length) {
     card.append(makeElement('p', 'Secondary watchlist'), renderAssets(window.secondaryAssets));
   }
+  const playKey = step?.name ?? window.playKey ?? window.id;
   if (status === 'focus') {
-    appendSessionPlays(card, step?.name ?? window.playKey ?? window.id, upcoming ? 'Plays to prepare' : 'Plays to watch');
+    appendSessionPlays(card, playKey, upcoming ? 'Plays to prepare' : 'Plays to watch');
+  }
+  if (status === 'prepare' && (playKey === 'ny-equity-prep' || playKey === 'Prepare the equity open')) {
+    card.append(memoryLink('Prepare prior-day levels with Market Memory'));
   }
   return card;
 }

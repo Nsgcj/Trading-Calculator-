@@ -73,6 +73,27 @@ const vwap = {
 
 const opening = [openingBreakout, vwap];
 
+const dayTwoRejection = {
+  name: 'Day Two · John Wick rejection',
+  watchFor: 'For a U.S. stock that made a large prior-day move, look for a wick into a prior-day edge or defended level, a close away from it and a break of the wick candle in the rejection direction. The opening confirmation window is 9:45–10:30 a.m. ET.',
+  invalidatedBy: 'Price breaks the wick extreme or there is no confirmed break away from the level.',
+  marketMemory: true,
+};
+
+const dayTwoContinuation = {
+  name: 'Day Two · Hold and retest (Hitchhiker)',
+  watchFor: 'In the 10:30–11:30 a.m. ET continuation window, look for a qualifying U.S. stock to hold beyond a marked level. Let the pullback confirm before considering a break of the new intraday range. Use the pullback wick for invalidation.',
+  invalidatedBy: 'Price returns through the broken level into the prior range or takes out the retest wick.',
+  marketMemory: true,
+};
+
+const dayTwoBackside = {
+  name: 'Day Two · Afternoon backside',
+  watchFor: 'During the eligible New York afternoon window, look for a U.S. stock to fail on a push into prior-day resistance, then break the floor of its new intraday range. VWAP or the next support level can frame the first target.',
+  invalidatedBy: 'Price reclaims the failed push, the range floor holds or the market closes before confirmation.',
+  marketMemory: true,
+};
+
 const afternoon = [
   {
     name: 'Afternoon trend pullback',
@@ -158,13 +179,13 @@ const playsById = new Map([
   ['new-york', macro],
   ['cme-metals', macro],
   ['ny-equity-window', opening],
-  ['cash-open-overlap', opening],
+  ['cash-open-overlap', [...opening, dayTwoRejection, dayTwoContinuation]],
   ['us-equities', opening],
   ['cme-equity', opening],
-  ['Confirmed entries and retests', opening],
-  ['Continuation and position management', morningContinuation],
-  ['afternoon-continuation', afternoon],
-  ['afternoon-energy', [...afternoon, energy[0]]],
+  ['Confirmed entries and retests', [...opening, dayTwoRejection]],
+  ['Continuation and position management', [...morningContinuation, dayTwoContinuation]],
+  ['afternoon-continuation', [...afternoon, dayTwoBackside]],
+  ['afternoon-energy', [...afternoon, energy[0], dayTwoBackside]],
   ['cme-energy', energy],
   ['ny-close', closing],
   ['power-hour', closing],

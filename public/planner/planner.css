@@ -269,6 +269,56 @@
 .session-plays strong {
   color: #d0dce7;
 }
+.planner-memory {
+  margin-top: 16px;
+  min-width: 0;
+  scroll-margin-top: 12px;
+}
+.memory-filters {
+  margin-bottom: 12px;
+}
+.memory-description,
+.memory-steps p,
+.memory-source {
+  color: var(--sub);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.memory-description {
+  margin: 0;
+}
+.memory-steps {
+  margin: 12px 0 0;
+  padding-left: 22px;
+}
+.memory-steps li {
+  padding-left: 5px;
+}
+.memory-steps li + li {
+  margin-top: 10px;
+}
+.memory-steps li::marker {
+  color: var(--teal);
+}
+.memory-steps h3,
+.memory-steps p {
+  margin: 0;
+}
+.memory-steps h3 {
+  font-size: 13px;
+}
+.memory-source {
+  margin: 14px 0 0;
+}
+.memory-source a,
+.memory-link {
+  color: var(--teal);
+}
+.memory-link {
+  display: inline-block;
+  margin-top: 11px;
+  font-size: 12px;
+}
 .planner-agenda {
   margin-top: 16px;
 }
