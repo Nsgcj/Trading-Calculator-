@@ -1,14 +1,16 @@
 import {accountReferences} from './account-references.mjs';
 import {supportsContractLookup,fetchContractSpec} from './contract-specs.mjs';
 import {getCurrentPrice,supportsCurrentPrice} from './quotes.mjs';
-import {ACCOUNT_STAGES,MODES,DEFAULT_ACCOUNTS,DEFAULT_INSTRUMENTS,sizePosition,resolveExitInputs,getHeadroom,getRiskBudget,usd,fmt} from './engine.mjs';
+import {ACCOUNT_STAGES,MODES,DEFAULT_ACCOUNTS,DEFAULT_INSTRUMENTS,sizePosition,resolveExitInputs,getAccountFloor,getHeadroom,usd,fmt} from './engine.mjs';
+import {PHIDIAS_ADVENT_2026,getContestStatus,getContestInstrumentLimit} from './contests.mjs';
 const STORAGE_KEY='chicken-man-riskdesk-v1';
 const $=id=>document.getElementById(id);
 const clone=o=>structuredClone(o);
 const escapeHTML=v=>String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const inputNumber=id=>$(id).value.trim()===''?NaN:Number($(id).value);
 const optionalNumber=id=>$(id).value.trim()===''?null:Number($(id).value);
-const pct=v=>Number((100*v).toFixed(2)).toLocaleString('en-US',{maximumFractionDigits:2})+'%';
+const pct=v=>Number.isFinite(v)?Number((100*v).toFixed(2)).toLocaleString('en-US',{maximumFractionDigits:2})+'%':'—';
+const defaultModeFractions=Object.fromEntries(Object.entries(MODES).map(([key,mode])=>[key,mode.fraction]));
 function addMissingPresets(saved, presets) {
  const savedIds = new Set(saved.map(item => item.id));
  return [...saved, ...clone(presets.filter(item => !savedIds.has(item.id)))];
@@ -19,6 +21,8 @@ let state=(()=>{
   if (saved?.accounts?.length && Array.isArray(saved.accounts) && saved?.instruments?.length && Array.isArray(saved.instruments) && saved.modeFractions) {
    return {
     ...saved,
+    mode: Object.hasOwn(MODES,saved.mode)?saved.mode:'normal',
+    modeFractions: {...defaultModeFractions,...saved.modeFractions},
     accounts: addMissingPresets(saved.accounts, DEFAULT_ACCOUNTS).map(account=>{
      const preset=DEFAULT_ACCOUNTS.find(item=>item.id===account.id);
      return account.stage || !preset?.stage ? account : {...account,stage:preset.stage};
@@ -34,12 +38,20 @@ let state=(()=>{
    };
   }
  } catch {}
- return { accounts:clone(DEFAULT_ACCOUNTS), instruments:clone(DEFAULT_INSTRUMENTS), accountId:'vest', instrumentId:'vest-nq', mode:'normal', modeFractions:{safe:.02,normal:.05,lottery:.60}, side:'long' };
+ return { accounts:clone(DEFAULT_ACCOUNTS), instruments:clone(DEFAULT_INSTRUMENTS), accountId:'vest', instrumentId:'vest-nq', mode:'normal', modeFractions:{...defaultModeFractions}, side:'long' };
 })();
 let currentResult=null,lastStopMode='price',quoteRequest,specRequest,entryQuote;
+let displayedContestStatus;
+const contestDateTime=new Intl.DateTimeFormat('en-US',{
+ timeZone:'America/New_York',weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short',
+});
 function save(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));}catch{}}
 function selectedAccount(){return state.accounts.find(a=>a.id===state.accountId)||state.accounts[0];}
 function selectedInstrument(){return state.instruments.find(s=>s.id===state.instrumentId)??{};}
+function isPhidiasContest(){
+ const account=selectedAccount();
+ return account.id===PHIDIAS_ADVENT_2026.id || account.contestId===PHIDIAS_ADVENT_2026.id;
+}
 function fillAccounts(){
  const groups=new Map();
  for(const account of state.accounts){
@@ -84,6 +96,43 @@ function fillInstruments(restoreAccountChoice=false){
  $('instrumentSelect').value=state.instrumentId;
  $('instrumentAccount').textContent=`Sizing account: ${account.name}.`;
 }
+function selectAccount(id){
+ const previousInstrument=state.instrumentId;
+ state.accountId=id;
+ $('accountSelect').value=id;
+ fillInstruments(true);
+ syncAccountFields();
+ if(previousInstrument!==state.instrumentId) syncSpecFields();
+ save();refresh();
+}
+
+function contestStatusKey({status,session,nextSession}){
+ return `${status}:${(session??nextSession)?.date??''}`;
+}
+function renderContest(status){
+ const {status:phase,session,nextSession}=status;
+ const key=contestStatusKey(status);
+ if(displayedContestStatus!==key){
+  displayedContestStatus=key;
+  $('contestStatus').textContent={upcoming:'Upcoming',open:'Session open',closed:'Between sessions',ended:'Contest ended'}[phase];
+  const doubleDoor=(session??nextSession)?.doubleDoor;
+  let timeline='';
+  if(session) timeline=`Session ends ${contestDateTime.format(new Date(session.closesAt))}.`;
+  else if(nextSession) timeline=`Next session opens ${contestDateTime.format(new Date(nextSession.opensAt))}.`;
+  else timeline=`Final Bell was ${contestDateTime.format(new Date(PHIDIAS_ADVENT_2026.endsAt))}.`;
+  if(doubleDoor) timeline+=` Double Door · ${doubleDoor}.`;
+  $('contestSession').textContent=timeline;
+ }
+ const active=isPhidiasContest();
+ $('selectContestAccount').hidden=active;
+ $('contestInstrumentLimit').hidden=!active;
+ if(!active) return;
+ const instrument=selectedInstrument();
+ const limit=getContestInstrumentLimit(PHIDIAS_ADVENT_2026.id,instrument);
+ $('contestInstrumentLimit').textContent=limit
+  ? `${limit.symbol} · ${limit.maxQuantity} ${limit.contractClass==='micro'?'micros':'standard or mini contracts'} maximum. If you already hold positions, enter the remaining cap for this contract below.`
+  : `${instrument.symbol} has no supported contract match for this contest. Select a Phidias-authorized futures contract from the catalog.`;
+}
 const nextStage={evaluation:'sim-funded','sim-funded':'live-funded'};
 function showReference(id, url){
  const link=$(id);
@@ -112,15 +161,22 @@ function syncAccountCommission(){
 }
 function syncAccountFields(){
  const a=selectedAccount();
- for(const k of ['equity','floor','reserve','maxQuantity'])$(k).value=a[k]??'';
+ const contest=isPhidiasContest();
+ for(const k of ['equity','reserve','maxQuantity'])$(k).value=a[k]??'';
+ $('floor').value=getAccountFloor(a)??'';
+ $('floor').readOnly=contest;
+ $('accountQuantityLabel').textContent=contest?'Remaining position cap (optional)':'Account max quantity';
  renderDailyRemaining();
  $('accountVerified').checked=Boolean(a.verified);
+ $('accountVerified').labels[0].textContent=contest
+  ? 'I checked the contest account’s equity, available position limit and rules in Phidias.'
+  : "I checked this account's live floor, daily limits and position caps on my platform.";
  $('noDailyLimit').checked=Boolean(a.noDailyLimit);
  $('dailyRemaining').disabled=Boolean(a.noDailyLimit);
  syncAccountCommission();
- $('accountReference').hidden=!a.sourceUrl;
+ $('accountReference').hidden=contest||!a.sourceUrl;
  if(a.sourceUrl) $('accountReference').href=a.sourceUrl;
- $('accountFloorLabel').textContent=a.stage==='personal'?'Personal loss floor':'Current failure floor';
+ $('accountFloorLabel').textContent=contest?'Static contest floor':a.stage==='personal'?'Personal loss floor':'Current failure floor';
  const next=nextStage[a.stage];
  $('createFundedBtn').hidden=!next;
  if(next) $('createFundedBtn').textContent=`+ Create ${ACCOUNT_STAGES[next]} profile`;
@@ -128,7 +184,7 @@ function syncAccountFields(){
   vest: 'Enter your live Vest equity and failure floor. The $500/$490 profile is an illustration.',
   futures: 'Enter the current failure floor, daily loss allowance and position limits for your prop firm program.',
  };
- $('accountNote').textContent = a.stage==='sim-funded' || a.stage==='live-funded'
+ $('accountNote').textContent = contest?'Enter your current simulated equity. The initial equity is $10,000. A loss down to $0 ends that entry.' : a.stage==='sim-funded' || a.stage==='live-funded'
   ? 'Enter this funded account’s own equity, current floor, daily loss allowance and position cap.'
   : a.stage==='personal'?'Enter equity and the minimum balance you want to keep. Add a daily loss limit or position cap if applicable.'
   : notes[a.platform] ?? 'Enter your current equity, loss floor and any venue or account limits.';
@@ -284,8 +340,9 @@ function setMode(mode){
  for(const key of Object.keys(MODES)){
   const b=$('mode-'+key);b.classList.toggle('active',key===mode);b.setAttribute('aria-pressed',String(key===mode));
  }
- $('lotteryNotice').hidden=mode!=='lottery';
- $('riskPercent').value=Number((state.modeFractions[mode]*100).toFixed(4));
+ $('lotteryNotice').hidden=!MODES[mode].level;
+ const fraction=state.modeFractions[mode];
+ $('riskPercent').value=Number.isFinite(fraction)?Number((fraction*100).toFixed(4)):'';
  for(const key of Object.keys(MODES))$(key+'Percent').textContent=pct(state.modeFractions[key]);
  save();refresh();
 }
@@ -296,8 +353,8 @@ function exitInputs(){
   assumedMovePercent:inputNumber('assumedMove'),targetMode:$('targetMode').value,rr:inputNumber('rr'),
  });
 }
-function params(fraction=state.modeFractions[state.mode]){
- return {account:selectedAccount(),instrument:selectedInstrument(),side:state.side,entry:quoteRequest||specRequest?NaN:inputNumber('entry'),...exitInputs(),slippageTicks:inputNumber('slippageTicks'),spreadTicks:inputNumber('spreadTicks'),feePerUnit:inputNumber('feePerUnit'),stressExtraTicks:inputNumber('stressTicks'),riskFraction:fraction};
+function params(fraction=state.modeFractions[state.mode],now=Date.now()){
+ return {account:selectedAccount(),instrument:selectedInstrument(),side:state.side,entry:quoteRequest||specRequest?NaN:inputNumber('entry'),...exitInputs(),slippageTicks:inputNumber('slippageTicks'),spreadTicks:inputNumber('spreadTicks'),feePerUnit:inputNumber('feePerUnit'),stressExtraTicks:inputNumber('stressTicks'),riskFraction:fraction,now};
 }
 function renderSummary(r){
  const a=selectedAccount(),h=getHeadroom(a);
@@ -336,7 +393,7 @@ function renderTicket(r){
  $('minimumTradeRiskRow').hidden=!hasMinimum;
  $('minimumTradeRisk').textContent=hasMinimum?`${usd(r.minimumUnitRisk)} / ${usd(r.budget)} budget`:'—';
  $('statusChip').className='state-chip '+(pending?'':r?.status==='CALCULATED'?'calculated':r?.status==='BLOCKED'?'blocked':'');
- $('statusChip').textContent=specRequest?'LOADING SPECS':quoteRequest?'QUOTING':r?.status??'PENDING';
+ $('statusChip').textContent=specRequest?'LOADING SPECS':quoteRequest?'QUOTING':good&&r.planOnly?'PLAN ONLY':r?.status??'PENDING';
  $('quantity').textContent=pending?'—':good?fmt(r.quantity,10):'NO TRADE';
  $('quantityUnit').textContent=s.unit??'';
  $('estimatedCosts').textContent=good?usd(r.roundTripCosts):'—';
@@ -347,7 +404,7 @@ function renderTicket(r){
  $('targetPriceLabel').textContent=exits.targetMode==='auto'?'Suggested take-profit':'Take-profit price';
  $('notional').textContent=good?usd(r.notionalUSD):'—';
  $('quantityCaption').textContent=fixedSize?'PLANNED SIZE · NATIVE PLATFORM UNITS':'MAX POSITION SIZE · NATIVE PLATFORM UNITS';
- $('quantityHint').textContent=good?`${s.symbol} · ${state.side.toUpperCase()} · ${fixedSize?'fixed planned quantity':'estimated maximum native quantity'}`:'Risk budget, platform minimum or setup validation prevents sizing.';
+ $('quantityHint').textContent=good?`${s.symbol} · ${state.side.toUpperCase()} · ${fixedSize?'fixed planned quantity':'estimated maximum native quantity'}${r.contestCapApplied?' · contest cap applied':''}`:'Risk budget, platform minimum or setup validation prevents sizing.';
  $('actualRisk').textContent=good?'−'+usd(r.risk):'—';
  $('targetProfit').textContent=good?usd(r.expectedReward):'—';
  $('effectiveRR').textContent=good&&Number.isFinite(r.rrNet)?`1 : ${fmt(r.rrNet,2)}`:'—';
@@ -356,17 +413,19 @@ function renderTicket(r){
  $('stopWidth').textContent=Number.isFinite(r.stopDistance)?`${fmt(r.stopDistance,6)} pts · ${fmt(r.stopTicks,2)} ticks`:'—';
  $('stressRisk').textContent=good?'−'+usd(r.stressRisk):'—';
  $('statusMessage').className='status-message '+(pending?'':r?.status==='BLOCKED'?'blocked':r?.status==='CALCULATED'?'verified':'');
- $('statusMessage').textContent=specRequest?'Loading published tick size and order rules…':quoteRequest?'Fetching public price before sizing…':r?.status==='BLOCKED'?'BLOCKED — '+(r.errors[0]||'One or more hard risk checks failed.') :r?.status==='VERIFY'?'VERIFY BEFORE USE — numbers are illustrative; check the account rules and any unverified contract assumptions.':'SIZED — values include entered execution costs. This is not broker permission to execute.';
+ $('statusMessage').textContent=specRequest?'Loading published tick size and order rules…':quoteRequest?'Fetching public price before sizing…':r?.status==='BLOCKED'?'BLOCKED — '+(r.errors[0]||'One or more hard risk checks failed.') :r?.planOnly?'PLAN ONLY · The contest is outside its scheduled trading session.':r?.status==='VERIFY'?'VERIFY BEFORE USE — numbers are illustrative; check the account rules and any unverified contract assumptions.':'SIZED — values include entered execution costs. This is not broker permission to execute.';
  $('warningList').replaceChildren(...(r?.warnings||[]).map(message=>{const el=document.createElement('div');el.className='warning-item';el.textContent=message;return el;}));
  if(!pending && r?.errors?.length>1)for(const message of r.errors.slice(1)){const el=document.createElement('div');el.className='warning-item';el.textContent=message;$('warningList').append(el);}
  $('copyBtn').disabled=r?.status!=='CALCULATED';
 }
-function renderModes(){
+function renderModes(now){
  const body=$('modeTable');body.replaceChildren();
  for(const mode of Object.keys(MODES)){
-  const fraction=state.modeFractions[mode],r=sizePosition(params(fraction));
+  const fraction=state.modeFractions[mode],r=sizePosition(params(fraction,now));
   const tr=document.createElement('tr');if(mode===state.mode)tr.className='row-highlight';
-  tr.innerHTML=`<td>${escapeHTML(MODES[mode].label)}</td><td>${escapeHTML(usd(r.budget))}</td><td>${escapeHTML(fmt(r.quantity,10))}</td><td>${escapeHTML(r.risk===undefined?'—':'−'+usd(r.risk))}</td><td>${escapeHTML(fmt(r.stop,10))}</td><td>${escapeHTML(fmt(r.target,10))}</td><td class="${r.status==='BLOCKED'?'bad-text':'good-text'}">${escapeHTML(r.status==='BLOCKED'?'NO SIZE':r.status==='VERIFY'?'VERIFY':'SIZED')}</td>`;
+  const label=r.status==='BLOCKED'?'NO SIZE':r.planOnly?'PLAN ONLY':r.status==='VERIFY'?'VERIFY':'SIZED';
+  const style=r.status==='BLOCKED'?'bad-text':r.status==='CALCULATED'?'good-text':'';
+  tr.innerHTML=`<td>${escapeHTML(MODES[mode].label)}</td><td>${escapeHTML(usd(r.budget))}</td><td>${escapeHTML(fmt(r.quantity,10))}</td><td>${escapeHTML(r.risk===undefined?'—':'−'+usd(r.risk))}</td><td>${escapeHTML(fmt(r.stop,10))}</td><td>${escapeHTML(fmt(r.target,10))}</td><td class="${style}">${label}</td>`;
   body.append(tr);
  }
 }
@@ -394,14 +453,17 @@ function renderDailyRemaining(){
   : 'Using the entered daily allowance alongside the account drawdown limit. Clear to return to auto.';
 }
 function refresh(){
+ const now=Date.now();
  setStopLabel();updateTargetMode();
  if(document.activeElement!==$('dailyRemaining')) renderDailyRemaining();
- const r=sizePosition(params());currentResult=r;
- renderSummary(r);renderTicket(r);renderModes();renderUnits(r);
+ const r=sizePosition(params(state.modeFractions[state.mode],now));currentResult=r;
+ renderContest(getContestStatus(PHIDIAS_ADVENT_2026.id,now));
+ renderSummary(r);renderTicket(r);renderModes(now);renderUnits(r);
 }
 function updateAccount(event){
  const account=selectedAccount();
- for(const key of ['equity','floor','reserve']) account[key]=inputNumber(key);
+ for(const key of ['equity','reserve']) account[key]=inputNumber(key);
+ account.floor=isPhidiasContest()?getAccountFloor(account):inputNumber('floor');
  account.maxQuantity=optionalNumber('maxQuantity');
  if(event.target.id==='dailyRemaining') account.dailyRemaining=optionalNumber('dailyRemaining');
  account.verified=$('accountVerified').checked;
@@ -467,13 +529,10 @@ function init(){
   window.history.replaceState(null,'',entryUrl);
  }
  fillAccounts();fillInstruments();syncAccountFields();syncSpecFields();setMode(state.mode||'normal');
- $('accountSelect').addEventListener('change',()=>{
-  const previousInstrument=state.instrumentId;
-  state.accountId=$('accountSelect').value;
-  fillInstruments(true);
-  syncAccountFields();
-  if(previousInstrument!==state.instrumentId) syncSpecFields();
-  save();refresh();
+ $('accountSelect').addEventListener('change',()=>selectAccount($('accountSelect').value));
+ $('selectContestAccount').addEventListener('click',()=>{
+  selectAccount(PHIDIAS_ADVENT_2026.id);
+  $('accountSelect').focus();
  });
  $('instrumentSelect').addEventListener('change',()=>{
   const instrument=state.instruments.find(item=>item.id===$('instrumentSelect').value);
@@ -549,13 +608,20 @@ function init(){
  $('copyStopPrice').addEventListener('click',()=>copyExitPrice('stopPrice','Stop-loss'));
  $('copyTargetPrice').addEventListener('click',()=>copyExitPrice('targetPrice','Take-profit'));
  $('copyBtn').addEventListener('click',async()=>{
+  if(isPhidiasContest()) refresh();
   const r=currentResult;if(!r||r.status!=='CALCULATED')return;
   const a=selectedAccount(),s=selectedInstrument();
-  const plan=`CHICKEN MAN — RISK DESK\nACCOUNT: ${a.name}\nINSTRUMENT: ${s.symbol}\nSIDE: ${state.side.toUpperCase()}\nMODE: ${MODES[state.mode].label} (${pct(state.modeFractions[state.mode])} of usable drawdown)\nEQUITY: ${usd(a.equity)} | FLOOR: ${usd(a.floor)} | RISK BUDGET: ${usd(r.budget)}\nENTRY: ${fmt(r.entry,10)}\nSTOP: ${fmt(r.stop,10)} (${r.stopMode==='auto'?'suggested':r.stopMode==='budget'?'drawdown budget':'manual'}) | TARGET: ${fmt(r.target,10)} (${r.targetMode==='auto'?'suggested':r.targetMode==='budget'?'drawdown budget':'stop distance'})\nORDER QUANTITY: ${fmt(r.quantity,10)} ${s.unit}\nMODELED LOSS: ${usd(r.risk)} | TARGET NET: ${usd(r.expectedReward)} | STRESS LOSS: ${usd(r.stressRisk)}\nModeled remaining floor buffer: ${usd(r.reservePostStop)}\nExecution estimates included. Not broker authorization. Stops may slip. Live rules must be checked.`;
+  const plan=`CHICKEN MAN — RISK DESK\nACCOUNT: ${a.name}\nINSTRUMENT: ${s.symbol}\nSIDE: ${state.side.toUpperCase()}\nMODE: ${MODES[state.mode].label} (${pct(state.modeFractions[state.mode])} of usable drawdown)\nEQUITY: ${usd(a.equity)} | FLOOR: ${usd(getAccountFloor(a))} | RISK BUDGET: ${usd(r.budget)}\nENTRY: ${fmt(r.entry,10)}\nSTOP: ${fmt(r.stop,10)} (${r.stopMode==='auto'?'suggested':r.stopMode==='budget'?'drawdown budget':'manual'}) | TARGET: ${fmt(r.target,10)} (${r.targetMode==='auto'?'suggested':r.targetMode==='budget'?'drawdown budget':'stop distance'})\nORDER QUANTITY: ${fmt(r.quantity,10)} ${s.unit}\nMODELED LOSS: ${usd(r.risk)} | TARGET NET: ${usd(r.expectedReward)} | STRESS LOSS: ${usd(r.stressRisk)}\nModeled remaining floor buffer: ${usd(r.reservePostStop)}\nExecution estimates included. Not broker authorization. Stops may slip. Live rules must be checked.`;
   try{await navigator.clipboard.writeText(plan);$('copyBtn').textContent='Copied ✓';setTimeout(()=>{$('copyBtn').innerHTML='Copy position plan <span>↗</span>';},1800);}catch{const old=$('copyBtn').textContent;$('copyBtn').textContent='Clipboard unavailable — use HTTPS';setTimeout(()=>{$('copyBtn').textContent=old;},1800);}
  });
  $('resetBtn').addEventListener('click',()=>{if(!window.confirm('Reset saved accounts and instrument settings to examples?'))return;localStorage.removeItem(STORAGE_KEY);window.location.reload();});
  for(const key of ['long','short']){$(key+'Btn').classList.toggle('active',state.side===key);$(key+'Btn').setAttribute('aria-pressed',String(state.side===key));}
  refresh();
+ window.setInterval(()=>{
+  const contest=getContestStatus(PHIDIAS_ADVENT_2026.id);
+  if(contestStatusKey(contest)===displayedContestStatus) return;
+  if(isPhidiasContest()) refresh();
+  else renderContest(contest);
+ },1000);
 }
 init();

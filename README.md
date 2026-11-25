@@ -35,7 +35,7 @@ Conservative slippage stress is shown separately. Models may miss gaps, stop rej
 
 1. Select profile `Vest Instant — example`, or create a new account for every separate platform/account.
 2. Enter **CURRENT** equity, **CURRENT** failure floor, optional reserve, daily remaining loss limit and native quantity cap. Example $500 equity and $490 floor means only $10 raw buffer; the $500 is **not** the risk budget.
-3. Choose **Very Safe**, **Normal**, or **Risk the Biscuit** and optionally edit the exact drawdown fraction. Defaults: 2%, 5%, 60% of **usable drawdown**.
+3. Choose **Very Safe** (2%), **Normal** (5%), or **Risk the Biscuit** (15%, 30%, or 60%). Each preset has an editable percentage of **usable drawdown**.
 4. Select instrument. Enter a real entry and the correct long/short *technical* invalidation stop, or its validated points/ticks/pips equivalent.
 5. Review the applied tick and order rules. Use the account’s quote currency conversion, fees and spread for any values the public contract feed does not supply.
 6. Review modeled native order size, dollar loss, expected reward, stress slippage and post-stop buffer. Only select trade if platform rules, margin and live risk gates also allow it. App is not an execution signal.
@@ -72,6 +72,10 @@ Published contract data is refreshed for supported venues. Manually edited contr
 ### Personal, evaluation, and funded profiles
 
 Use the **Account profile** dropdown to choose a personal broker, evaluation, sim-funded, or live-funded profile. Select **Create Simulated funded profile** or **Create Live funded profile** to start the next stage on the same contract platform. You can choose any stage when creating a profile. The new profile starts with blank equity and floor so it uses the new account’s rules, while the earlier profile retains its own settings. Profiles are stored in this browser.
+
+### Contest accounts
+
+Select **Use contest profile** for the Phidias 10K Drawdown Challenge Advent Edition 2026. It starts at $10,000 simulated equity with a fixed $0 floor. Sizing uses the selected contract’s contest cap and any lower remaining cap you enter. Update equity and enter the capacity remaining on your platform when holding other positions. Outside the published contest session, the ticket labels valid sizing **Plan only**. [Phidias Advent rules](https://member.phidiaspropfirm.com/advent/rules?_lang=en)
 
 ### Finding an instrument
 
