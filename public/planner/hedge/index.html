@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0c1320">
+  <meta name="description" content="Size a futures hedge for an equity position with an exit date, modeled protection and account risk limits.">
+  <title>CHICKEN MAN | Hedge Sizer</title>
+  <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../styles.css">
+  <link rel="stylesheet" href="../planner.css">
+  <link rel="stylesheet" href="./hedge.css">
+  <script type="module" src="./hedge-app.mjs"></script>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="../../" aria-label="Risk Desk home">
+        <span class="brand-icon">C<span class="corner">M</span></span>
+        <span><strong>CHICKEN MAN</strong><small>RISK DESK</small></span>
+      </a>
+      <nav class="desk-nav" aria-label="Main navigation">
+        <a href="../../">Risk Calculator</a>
+        <a href="../">Trade Planner</a>
+        <a href="./" aria-current="page">Hedge Sizer</a>
+      </nav>
+    </header>
+
+    <main class="hedge-page">
+      <div class="hedge-heading">
+        <h1>Hedge Sizer</h1>
+        <p>Size a futures hedge for a stock or ETF position. Compare modeled protection and hedge losses, then set a date to exit.</p>
+      </div>
+
+      <div class="hedge-layout">
+        <form id="hedgeForm" class="panel hedge-form" aria-label="Hedge inputs">
+          <fieldset>
+            <legend>Position and futures contract</legend>
+            <div class="hedge-fields">
+              <div class="field">
+                <label for="direction">Equity position direction</label>
+                <select id="direction">
+                  <option value="long">Long</option>
+                  <option value="short">Short</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="portfolioValue">Equity position market value <span>USD</span></label>
+                <input id="portfolioValue" type="number" min="0" step="any" inputmode="decimal" required>
+              </div>
+              <div class="field">
+                <label for="contractId">Futures contract</label>
+                <select id="contractId" required></select>
+              </div>
+              <div class="field">
+                <label for="entryPrice">Futures entry price <span>points</span></label>
+                <input id="entryPrice" type="number" min="0" step="any" inputmode="decimal" aria-describedby="hedgePriceHelp" required>
+              </div>
+              <div class="field">
+                <label for="beta">Portfolio beta to this index</label>
+                <input id="beta" type="number" min="0" step="any" value="1" inputmode="decimal" aria-describedby="hedgeBetaHelp" required>
+              </div>
+              <div class="field">
+                <label for="coveragePercent">Maximum exposure to hedge <span>%</span></label>
+                <input id="coveragePercent" type="number" min="0" max="100" step="any" value="35" inputmode="decimal" aria-describedby="hedgeBetaHelp" required>
+              </div>
+            </div>
+            <p class="hedge-help" id="hedgePriceHelp">Use the price for the futures expiry you plan to trade.</p>
+            <p class="hedge-help" id="hedgeBetaHelp">Beta-equivalent exposure is position market value × beta to the chosen index. The coverage cap applies to that exposure.</p>
+          </fieldset>
+
+          <fieldset>
+            <legend>Market scenarios and loss limit</legend>
+            <div class="hedge-fields">
+              <div class="field">
+                <label for="downPercent">Modeled index decline <span>%</span></label>
+                <input id="downPercent" type="number" min="0.0001" max="100" step="any" value="2" inputmode="decimal" aria-describedby="hedgeScenarioHelp" required>
+              </div>
+              <div class="field">
+                <label for="upPercent">Modeled index advance <span>%</span></label>
+                <input id="upPercent" type="number" min="0.0001" max="100" step="any" value="2" inputmode="decimal" aria-describedby="hedgeScenarioHelp" required>
+              </div>
+              <div class="field">
+                <label for="riskLimit">Hedge loss budget <span>USD</span></label>
+                <input id="riskLimit" type="number" min="0" step="any" inputmode="decimal" aria-describedby="hedgeRiskHelp" required>
+              </div>
+              <div class="field">
+                <label for="targetProtection">Minimum protection <span>USD · optional</span></label>
+                <input id="targetProtection" type="number" min="0" step="any" inputmode="decimal" aria-describedby="hedgeTargetHelp">
+              </div>
+            </div>
+            <p class="hedge-help" id="hedgeScenarioHelp">Estimate the total index move through your planned exit. Review both percentages when switching from a week to a month.</p>
+            <p class="hedge-help" id="hedgeRiskHelp">The loss budget caps the modeled adverse futures move plus costs.</p>
+            <p class="hedge-help" id="hedgeTargetHelp">Minimum protection is the desired futures gain after costs in the scenario where the equity position loses value.</p>
+          </fieldset>
+
+          <fieldset>
+            <legend>Planned exit</legend>
+            <div class="hedge-fields">
+              <div class="field">
+                <label for="horizon">Exit horizon</label>
+                <select id="horizon" aria-describedby="horizonSummary">
+                  <option value="week">End of week</option>
+                  <option value="month">End of month</option>
+                  <option value="custom">Custom date</option>
+                </select>
+              </div>
+              <div class="field" id="customDateField" hidden>
+                <label for="customDate">Custom exit date</label>
+                <input id="customDate" type="date" aria-describedby="horizonSummary">
+              </div>
+              <div class="field">
+                <label for="expiryDate">Futures last trading date <span>optional</span></label>
+                <input id="expiryDate" type="date" aria-describedby="hedgePriceHelp">
+              </div>
+            </div>
+            <p class="hedge-help" id="horizonSummary" aria-live="polite"></p>
+            <div class="check-row hedge-hold">
+              <input id="holdingAllowed" type="checkbox">
+              <label for="holdingAllowed">My account permits holding futures through the planned exit.</label>
+            </div>
+          </fieldset>
+
+          <details class="hedge-details">
+            <summary>Costs, margin and contract limits</summary>
+            <div class="hedge-fields">
+              <div class="field">
+                <label for="feePerContract">Round-trip fees and slippage <span>USD per contract</span></label>
+                <input id="feePerContract" type="number" min="0" step="any" placeholder="0" inputmode="decimal">
+              </div>
+              <div class="field">
+                <label for="holdingCostPerContract">Estimated holding and roll costs <span>USD per contract</span></label>
+                <input id="holdingCostPerContract" type="number" min="0" step="any" placeholder="0" inputmode="decimal" aria-describedby="hedgeHoldingCostsHelp">
+              </div>
+              <div class="field">
+                <label for="availableMargin">Available margin <span>USD · optional</span></label>
+                <input id="availableMargin" type="number" min="0" step="any" inputmode="decimal" aria-describedby="hedgeMarginHelp">
+              </div>
+              <div class="field">
+                <label for="marginPerContract">Initial overnight margin <span>USD per contract · optional</span></label>
+                <input id="marginPerContract" type="number" min="0" step="any" inputmode="decimal" aria-describedby="hedgeMarginHelp">
+              </div>
+              <div class="field">
+                <label for="maxContracts">Remaining contract cap <span>optional</span></label>
+                <input id="maxContracts" type="number" min="0" step="1" inputmode="numeric">
+              </div>
+            </div>
+            <p class="hedge-help" id="hedgeHoldingCostsHelp">Estimate the total cost per contract through your planned exit, including any planned rolls.</p>
+            <p class="hedge-help" id="hedgeMarginHelp">Enter both margin figures to apply a margin limit.</p>
+          </details>
+
+          <button type="submit" class="copy-button hedge-submit">Calculate hedge</button>
+        </form>
+
+        <section class="panel hedge-output" aria-labelledby="hedgeResultsTitle">
+          <h2 id="hedgeResultsTitle" tabindex="-1">Hedge plan</h2>
+          <p id="hedgeStatus" class="status-message hedge-status" role="status">Enter the equity position value, futures entry price and hedge loss limit to calculate.</p>
+          <div id="hedgeResults" class="hedge-results"></div>
+        </section>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

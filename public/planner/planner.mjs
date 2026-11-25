@@ -70,6 +70,12 @@ function playbookArticle({ id, title, window, overview, assets, preparation, set
   marketList.append(...assets.map(asset => makeElement('li', asset)));
   markets.append(marketList);
   fields.append(makeElement('dt', 'Markets'), markets);
+  article.append(headingRow, makeElement('p', window, 'playbook-timing'), makeElement('p', overview));
+  if (id === 'equity-hedge') {
+    const sizer = makeElement('a', 'Open Hedge Sizer', 'planner-library-link');
+    sizer.href = './hedge/';
+    article.append(sizer);
+  }
   const playList = makeElement('div', '', 'playbook-setups');
   playList.append(makeElement('h4', 'Setups'));
   for (const { name, trigger, invalidation, management } of setups) {
@@ -81,8 +87,7 @@ function playbookArticle({ id, title, window, overview, assets, preparation, set
     card.append(makeElement('h5', name), rules);
     playList.append(card);
   }
-  article.append(headingRow, makeElement('p', window, 'playbook-timing'), makeElement('p', overview), fields,
-    playbookChecklist('Preparation', preparation, true), playList, playbookChecklist('When to skip', skip));
+  article.append(fields, playbookChecklist('Preparation', preparation, true), playList, playbookChecklist('When to skip', skip));
   for (const { label, url } of sources) {
     const link = makeElement('a', label, 'playbook-source');
     link.href = url;

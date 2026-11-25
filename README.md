@@ -52,6 +52,8 @@ Open **Trade Planner** for the Chicken Man execution windows, the broader 24-hou
 
 Select **Browse playbooks** for the detailed session guides, including preparation, entry confirmation, invalidation, and trade management. Relevant session cards link directly to the guides.
 
+Use **Hedge Sizer** to model a partial offset for long or short equity exposure with ES, MES, NQ, or MNQ. It compares rising, flat, and falling benchmark scenarios after entered costs and can size toward an optional dollar protection target within the entered loss, position, margin, and coverage limits. Week-end and month-end dates use scheduled U.S. cash closes. Verify your futures contract’s last trading date, overnight permissions, and margin for the holding period.
+
 ### Automatic entry and exit levels
 
 - Uncheck **Use manual stop-loss** or leave its input blank for an automatic stop. The default is a 1% adverse move from entry, adjusted to the instrument’s tick. Change the distance if you need a different scenario.
