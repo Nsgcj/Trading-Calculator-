@@ -58,6 +58,8 @@ Use **Stack Planner** for same-direction first entries and additions across Vest
 
 Use **Vest Accounts** to track your saved Vest profiles and assign a scalp, intraday, or swing role. The count excludes the demo and inactive profiles. Choose a session, record holding permissions, and enter the planned loss with costs to compare it with the account’s available room under the current Risk Desk mode. Role assignments are saved in this browser and linked to Risk Calculator and Stack Planner.
 
+Use **Compound Calculator** to plan a shared closed-profit goal across 1–10 Vest accounts. The $100 example starts with three accounts at $10 of usable drawdown each. You can edit those values or select tracked Vest profiles and enter their actual drawdown room. For other accounts, add separate goals with individual drawdown and closed P&L. Enter your closed win/loss sample, average win after costs in R, and opportunities per week for modeled timelines. The loss-streak guard caps the risk fraction and the optional smallest-order loss checks whether that risk can support an order. The projection uses a fixed failure floor and reserve, with closed gains left in the account.
+
 Use **Hedge Review** for an existing hedge. Enter your chart invalidation level and last completed close. Review alerts progress from proximity to a break and then confirmed follow-through. The risk check protects the higher of peak equity minus allowed giveback and the firm floor plus reserve. It models the smallest trim that fits the entered adverse move and exit costs. Each account keeps its own drawdown room. Review results use fresh manual inputs each time.
 
 ### Automatic entry and exit levels
