@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import handler from '../netlify/functions/vest-specs.mjs';
+import { fetchContractSpec } from '../public/contract-specs.mjs';
 
 const venueSpec = {
   symbol: 'NDX-USD-PERP', displaySymbol: 'NQ-PERP', base: 'NDX-USD', quote: 'USDC',
@@ -23,6 +24,37 @@ test('Vest reads tick and quantity increments from the requested market', async 
   assert.equal(spec.minQuantity, 0.0001);
   assert.equal(spec.pointValueQuote, 1);
   assert.equal(spec.minNotionalQuote, undefined);
+  assert.equal(spec.takerFeeRate, undefined);
+});
+
+test('Vest publishes a valid taker fee fraction and omits unusable rates', async t => {
+  let takerFee;
+  t.mock.method(globalThis, 'fetch', async () => Response.json({ symbols: [{ ...venueSpec, takerFee }] }));
+
+  for (const [input, expected] of [['0.000025', 0.000025], ['0', 0], ['', undefined], [null, undefined], ['Infinity', undefined], ['-0.001', undefined], ['1', undefined]]) {
+    takerFee = input;
+    const response = await handler(new Request(`${endpoint}?market=nq`));
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).takerFeeRate, expected);
+  }
+});
+
+test('Vest browser lookup retains optional valid fees without blocking contract specifications', async t => {
+  const instrument = { id: 'vest-nq', symbol: 'NQ-PERP', platform: 'vest', unit: 'units' };
+  let takerFeeRate;
+  t.mock.method(globalThis, 'fetch', async () => Response.json({
+    symbol: instrument.symbol,
+    tickSize: 0.25,
+    quantityStep: 0.0001,
+    minQuantity: 0.0001,
+    pointValueQuote: 1,
+    takerFeeRate,
+  }));
+
+  for (const [input, expected] of [[0.000025, 0.000025], [0, 0], [undefined, undefined], [null, undefined], [-0.001, undefined], [1, undefined]]) {
+    takerFeeRate = input;
+    assert.equal((await fetchContractSpec(instrument)).takerFeeRate, expected);
+  }
 });
 
 test('Vest rejects a different contract or invalid precision', async t => {

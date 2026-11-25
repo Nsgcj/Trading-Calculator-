@@ -77,11 +77,14 @@ function parseBybit(data, instrument) {
 
 function parseVest(data, instrument) {
   if (data?.symbol !== instrument.symbol || data.pointValueQuote !== 1) return null;
+  const takerFeeRate = number(data.takerFeeRate);
+  const hasTakerFeeRate = Number.isFinite(takerFeeRate) && takerFeeRate >= 0 && takerFeeRate < 1;
   return {
     tickSize: number(data.tickSize),
     quantityStep: number(data.quantityStep),
     minQuantity: number(data.minQuantity),
     pointValueQuote: data.pointValueQuote,
+    ...(hasTakerFeeRate ? { takerFeeRate } : {}),
     source: `Vest Markets Exchange Info and contract sizing guide (${instrument.symbol}, USDC)`,
   };
 }
