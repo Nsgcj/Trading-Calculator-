@@ -3,6 +3,7 @@ import {supportsContractLookup,fetchContractSpec} from './contract-specs.mjs';
 import {getCurrentPrice,supportsCurrentPrice} from './quotes.mjs';
 import {ACCOUNT_STAGES,MODES,DEFAULT_ACCOUNTS,DEFAULT_INSTRUMENTS,sizePosition,resolveExitInputs,getAccountFloor,getHeadroom,usd,fmt} from './engine.mjs';
 import {PHIDIAS_ADVENT_2026,getContestStatus,getContestInstrumentLimit} from './contests.mjs';
+import {mergeVestAccounts,readVestRoster} from './vest-accounts.mjs';
 const STORAGE_KEY='chicken-man-riskdesk-v1';
 const $=id=>document.getElementById(id);
 const clone=o=>structuredClone(o);
@@ -16,6 +17,7 @@ function addMissingPresets(saved, presets) {
  return [...saved, ...clone(presets.filter(item => !savedIds.has(item.id)))];
 }
 let state=(()=>{
+ const roster=readVestRoster();
  try {
   const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
   if (saved?.accounts?.length && Array.isArray(saved.accounts) && saved?.instruments?.length && Array.isArray(saved.instruments) && saved.modeFractions) {
@@ -23,10 +25,10 @@ let state=(()=>{
     ...saved,
     mode: Object.hasOwn(MODES,saved.mode)?saved.mode:'normal',
     modeFractions: {...defaultModeFractions,...saved.modeFractions},
-    accounts: addMissingPresets(saved.accounts, DEFAULT_ACCOUNTS).map(account=>{
+    accounts: mergeVestAccounts(addMissingPresets(saved.accounts, DEFAULT_ACCOUNTS).map(account=>{
      const preset=DEFAULT_ACCOUNTS.find(item=>item.id===account.id);
      return account.stage || !preset?.stage ? account : {...account,stage:preset.stage};
-    }),
+    }),roster),
     instruments: addMissingPresets(saved.instruments, DEFAULT_INSTRUMENTS).map(instrument=>{
      if(instrument.sourceUrl || instrument.platform!=='futures') return instrument;
      const official=DEFAULT_INSTRUMENTS.find(preset=>preset.id===instrument.id);
@@ -38,7 +40,7 @@ let state=(()=>{
    };
   }
  } catch {}
- return { accounts:clone(DEFAULT_ACCOUNTS), instruments:clone(DEFAULT_INSTRUMENTS), accountId:'vest', instrumentId:'vest-nq', mode:'normal', modeFractions:{...defaultModeFractions}, side:'long' };
+ return { accounts:mergeVestAccounts(clone(DEFAULT_ACCOUNTS),roster), instruments:clone(DEFAULT_INSTRUMENTS), accountId:'vest', instrumentId:'vest-nq', mode:'normal', modeFractions:{...defaultModeFractions}, side:'long' };
 })();
 let currentResult=null,lastStopMode='price',quoteRequest,specRequest,entryQuote;
 let displayedContestStatus;
@@ -522,13 +524,18 @@ function openAccountPanel(fromAccount){
 function init(){
  $('newAccountStage').replaceChildren(...Object.entries(ACCOUNT_STAGES).map(([id,label])=>new Option(label,id)));
  const entryUrl=new URL(window.location.href);
- const plannedInstrument=entryUrl.searchParams.get('instrument');
- if(state.instruments.some(instrument=>instrument.id===plannedInstrument)){
-  state.instrumentId=plannedInstrument;
-  entryUrl.searchParams.delete('instrument');
-  window.history.replaceState(null,'',entryUrl);
+ const linkedAccount=state.accounts.find(account=>account.id===entryUrl.searchParams.get('account'));
+ const linkedInstrument=state.instruments.find(instrument=>instrument.id===entryUrl.searchParams.get('instrument'));
+ if(linkedAccount){
+  state.accountId=linkedAccount.id;
+  entryUrl.searchParams.delete('account');
  }
- fillAccounts();fillInstruments();syncAccountFields();syncSpecFields();setMode(state.mode||'normal');
+ if(linkedInstrument){
+  state.instrumentId=linkedInstrument.id;
+  entryUrl.searchParams.delete('instrument');
+ }
+ if(linkedAccount||linkedInstrument) window.history.replaceState(window.history.state,'',entryUrl);
+ fillAccounts();fillInstruments(Boolean(linkedAccount&&!linkedInstrument));syncAccountFields();syncSpecFields();setMode(state.mode||'normal');
  $('accountSelect').addEventListener('change',()=>selectAccount($('accountSelect').value));
  $('selectContestAccount').addEventListener('click',()=>{
   selectAccount(PHIDIAS_ADVENT_2026.id);

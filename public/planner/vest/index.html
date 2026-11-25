@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0c1320">
+  <meta name="description" content="Track Vest accounts, assign scalp, intraday, or swing roles, and review planned risk before a trading session.">
+  <title>CHICKEN MAN | Vest Accounts</title>
+  <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../styles.css">
+  <link rel="stylesheet" href="../planner.css">
+  <link rel="stylesheet" href="../hedge/hedge.css">
+  <link rel="stylesheet" href="./vest.css">
+  <script type="module" src="./vest-roster-app.mjs"></script>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="../../" aria-label="Risk Desk home">
+        <span class="brand-icon">C<span class="corner">M</span></span>
+        <span><strong>CHICKEN MAN</strong><small>RISK DESK</small></span>
+      </a>
+      <nav class="desk-nav" aria-label="Main navigation">
+        <a href="../../">Risk Calculator</a>
+        <a href="../">Trade Planner</a>
+        <a href="../stack/">Stack Planner</a>
+        <a href="./" aria-current="page">Vest Accounts</a>
+      </nav>
+    </header>
+
+    <main class="hedge-page vest-page">
+      <div class="hedge-heading">
+        <h1>Vest Accounts</h1>
+        <p>Give each tracked Vest account a trading role and a session. Review its hold permissions and modeled loss before you size a position.</p>
+        <a class="planner-library-link" href="#vestPlaybook">Browse the role playbook</a>
+      </div>
+
+      <div class="vest-overview">
+        <section class="panel vest-summary" aria-labelledby="vestSummaryTitle">
+          <h2 id="vestSummaryTitle">Roster summary</h2>
+          <dl class="hedge-metrics vest-metrics">
+            <div><dt>Active tracked profiles</dt><dd id="vestActiveCount">—</dd></div>
+            <div><dt>Active profiles with a role</dt><dd id="vestRoleCount">—</dd></div>
+          </dl>
+          <p id="vestRoleBreakdown" class="hedge-help"></p>
+          <p class="hedge-help">Counts use the Vest profiles saved on this browser. The demo is excluded.</p>
+          <p id="vestModeSummary" class="hedge-help vest-mode-summary"></p>
+        </section>
+        <form id="vestAddForm" class="panel vest-add" aria-labelledby="vestAddTitle">
+          <h2 id="vestAddTitle">Add a Vest account</h2>
+          <label for="vestAccountName">Account nickname</label>
+          <div class="vest-add-controls">
+            <input id="vestAccountName" type="text" maxlength="70" autocomplete="off" placeholder="e.g. Vest 01" required>
+            <button type="submit" class="copy-button hedge-submit">Track account</button>
+          </div>
+          <p class="hedge-help">Use a nickname you recognize for an account you already have.</p>
+          <p id="vestAddStatus" class="vest-status" role="status"></p>
+        </form>
+      </div>
+
+      <section class="vest-roster-section" aria-labelledby="vestRosterTitle">
+        <h2 id="vestRosterTitle">Account roster</h2>
+        <p class="hedge-help vest-roster-note">Choose the role and session for each account. Keep overlapping Vest positions on the same side for your plan.</p>
+        <p id="vestRosterStatus" class="vest-status" role="status"></p>
+        <p id="vestRosterEmpty" class="panel vest-empty">Add a Vest account to start your roster.</p>
+        <div id="vestRoster" class="vest-roster"></div>
+      </section>
+
+      <section id="vestPlaybook" class="vest-playbook" aria-labelledby="vestPlaybookTitle">
+        <h2 id="vestPlaybookTitle">Role playbook</h2>
+        <p class="hedge-help vest-playbook-note">Assign a scalp or intraday role when your planned stop and costs fit the account’s loss cap. Give swing trades an account with enough room for the wider stop and permission for the intended hold. Leave an account unassigned when the trade you want to take exceeds its limits.</p>
+        <p class="hedge-help vest-playbook-note">Your execution plan uses Eastern Time. The Asian window runs 8–11 p.m. and London runs 2–5 a.m. For the U.S. cash open, observe from 9:30 to 9:45 a.m. At 11:30 a.m., pause new entries until 1:30 p.m. Check the live execution phase, market eligibility and holiday changes in the <a href="../">Trade Planner</a>.</p>
+        <div class="vest-role-grid">
+          <article id="role-scalp" class="panel vest-role-card" aria-labelledby="vestScalpTitle">
+            <h3 id="vestScalpTitle">Scalp</h3>
+            <dl>
+              <div><dt>Entry setup</dt><dd>At a marked range edge, look for a sweep, a reclaim back inside, and a confirming break away. Place the structural stop beyond the sweep.</dd></div>
+              <div><dt>Holding window</dt><dd>Minutes within an eligible execution phase. For the U.S. cash open, the first confirmation window is 9:45–10:30 a.m. ET.</dd></div>
+              <div><dt>Skip or exit</dt><dd>Skip when spread, fees or slippage leave too little room to the first target. Exit at the planned level or when the setup is invalidated.</dd></div>
+            </dl>
+          </article>
+          <article id="role-intraday" class="panel vest-role-card" aria-labelledby="vestIntradayTitle">
+            <h3 id="vestIntradayTitle">Intraday</h3>
+            <dl>
+              <div><dt>Entry setup</dt><dd>Wait for a hold outside a completed range or a pullback to a defended level. Require a confirming break and set the stop beyond the retest swing.</dd></div>
+              <div><dt>Holding window</dt><dd>Same trading day. For New York, morning continuation runs 10:30–11:30 a.m. ET and afternoon continuation runs 1:30–3 p.m. ET.</dd></div>
+              <div><dt>Skip or exit</dt><dd>Manage existing trades during downtime. Skip entries that conflict with news restrictions. Plan exits before the account’s cutoff.</dd></div>
+            </dl>
+          </article>
+          <article id="role-swing" class="panel vest-role-card" aria-labelledby="vestSwingTitle">
+            <h3 id="vestSwingTitle">Swing</h3>
+            <dl>
+              <div><dt>Entry setup</dt><dd>Mark a higher-time-frame level and wait for a confirmed rejection or breakout retest in an eligible entry phase. Put the stop beyond the structure that supports the trade.</dd></div>
+              <div><dt>Holding window</dt><dd>Multiple sessions when the account permits the intended hold. Confirm overnight and weekend rules separately, and set a planned exit and next review.</dd></div>
+              <div><dt>Skip or exit</dt><dd>Before entry, model the loss at the stop including fees, slippage, and expected funding through exit. Skip if the loss exceeds the risk budget or the hold is restricted.</dd></div>
+            </dl>
+          </article>
+        </div>
+      </section>
+
+      <template id="vestRosterTemplate">
+        <article class="panel vest-account" data-vest-account>
+          <div class="vest-account-heading">
+            <h3 data-account-name></h3>
+            <span class="vest-account-state" data-account-state></span>
+          </div>
+          <div class="hedge-fields">
+            <label class="field vest-field">
+              <span class="vest-field-caption">Trading role</span>
+              <select data-role>
+                <option value="unassigned">Unassigned</option>
+                <option value="scalp">Scalp</option>
+                <option value="intraday">Intraday</option>
+                <option value="swing">Swing</option>
+              </select>
+            </label>
+            <label class="field vest-field">
+              <span class="vest-field-caption">Preferred entry session</span>
+              <select data-session>
+                <option value="">Choose a session</option>
+                <option value="asia">Asian focus</option>
+                <option value="london">London focus</option>
+                <option value="ny-open">New York morning</option>
+                <option value="ny-afternoon">New York afternoon</option>
+              </select>
+            </label>
+            <label class="field vest-field">
+              <span class="vest-field-caption">Modeled loss through exit <span>USD · optional</span></span>
+              <input data-planned-loss type="number" min="0" step="any" inputmode="decimal">
+            </label>
+          </div>
+          <div class="vest-permissions">
+            <label class="check-row vest-permission"><input data-overnight type="checkbox"> Account permits overnight holds</label>
+            <label class="check-row vest-permission"><input data-weekend type="checkbox"> Account permits weekend holds</label>
+          </div>
+          <div class="vest-account-check" data-check role="status"></div>
+          <div class="vest-account-actions">
+            <a class="link-button" href="../../" data-risk-link>Risk Calculator</a>
+            <a class="link-button" href="../stack/" data-stack-link>Stack Planner</a>
+            <a class="link-button" href="#vestPlaybook" data-role-guide>Role playbook</a>
+            <button type="button" class="link-button vest-active-action" data-toggle-active>Mark inactive</button>
+          </div>
+        </article>
+      </template>
+    </main>
+  </div>
+</body>
+</html>

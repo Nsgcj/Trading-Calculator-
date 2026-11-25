@@ -56,6 +56,8 @@ Use **Hedge Sizer** to model a partial offset for long or short equity exposure 
 
 Use **Stack Planner** for same-direction first entries and additions across Vest index perpetuals and CME futures. Include each account’s current position for the selected Nasdaq-100 or S&P 500 market. Enter current marked equity, equity excluding open P&L, and current failure floor separately. The planner uses the lower equity figure for sizing, counts open risk through the entered stop, and blocks additions if a listed position is on the opposite side. A shared total modeled loss cap allocates leftover capacity in account order. The tool uses one entered stop per account and leaves order execution and account-rule checks with the trader.
 
+Use **Vest Accounts** to track your saved Vest profiles and assign a scalp, intraday, or swing role. The count excludes the demo and inactive profiles. Choose a session, record holding permissions, and enter the planned loss with costs to compare it with the account’s available room under the current Risk Desk mode. Role assignments are saved in this browser and linked to Risk Calculator and Stack Planner.
+
 Use **Hedge Review** for an existing hedge. Enter your chart invalidation level and last completed close. Review alerts progress from proximity to a break and then confirmed follow-through. The risk check protects the higher of peak equity minus allowed giveback and the firm floor plus reserve. It models the smallest trim that fits the entered adverse move and exit costs. Each account keeps its own drawdown room. Review results use fresh manual inputs each time.
 
 ### Automatic entry and exit levels

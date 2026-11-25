@@ -2,6 +2,8 @@ import { DEFAULT_ACCOUNTS, MODES, fmt } from '../../engine.mjs';
 import { fetchContractSpec } from '../../contract-specs.mjs';
 import { getCurrentPrice } from '../../quotes.mjs';
 import { sizeStackPlan, STACK_CONTRACTS } from '../../stack.mjs';
+import { mergeVestAccounts, readVestRoster } from '../../vest-accounts.mjs';
+import { VEST_ROLES } from '../../vest-role-plan.mjs';
 
 const field = id => document.getElementById(id);
 const form = field('stackForm');
@@ -29,9 +31,11 @@ const draft = readLocal(storageKey);
 const plans = draft.plans && typeof draft.plans === 'object' ? draft.plans : {};
 let displayedFamily;
 const savedAccounts = Array.isArray(riskDesk.accounts) ? riskDesk.accounts : [];
-const profiles = [...new Map([...DEFAULT_ACCOUNTS, ...savedAccounts].filter(account =>
+const baseProfiles = [...new Map([...DEFAULT_ACCOUNTS, ...savedAccounts].filter(account =>
   account?.id && ['vest', 'futures'].includes(account.platform) && account.stage !== 'contest',
 ).map(account => [account.id, account])).values()];
+const vestRoster = readVestRoster();
+const profiles = mergeVestAccounts(baseProfiles, vestRoster);
 const activeProfile = profiles.find(account => account.id === riskDesk.accountId);
 const getProfile = id => profiles.find(account => account.id === id);
 const getContract = id => STACK_CONTRACTS.find(contract => contract.id === id);
@@ -174,7 +178,14 @@ function addAccount(saved) {
   const state = { revision: 0, markRevision: 0, rateEdited: saved?.rateEdited === true };
   rows.set(row, state);
   const picker = input(row, 'profile');
-  picker.append(new Option('Manual account', 'manual'), ...profiles.map(profile => new Option(profile.name, profile.id)));
+  picker.append(new Option('Manual account', 'manual'), ...profiles.map(profile => {
+    const plan = vestRoster.plans[profile.id];
+    const role = Object.hasOwn(VEST_ROLES, plan?.role) && plan.role !== 'unassigned' ? VEST_ROLES[plan.role] : '';
+    const note = plan?.inactive ? 'Inactive' : role;
+    const option = new Option(note ? `${profile.name} · ${note}` : profile.name, profile.id);
+    option.disabled = plan?.inactive === true;
+    return option;
+  }));
   picker.value = getProfile(saved?.values?.profile) ? saved.values.profile : 'manual';
   applyProfile(row);
   selectContracts(row, saved?.values?.contractId);
@@ -262,21 +273,32 @@ function renderPlan(plan, accounts) {
   showStatus(active ? 'Same-direction plan calculated.' : 'No new units fit the current setup.', active ? 'ready' : 'attention');
 }
 
-function loadPlan() {
+function loadPlan(profileId = activeProfile?.id) {
   displayedFamily = family.value;
   const plan = plans[displayedFamily];
   side.value = plan?.side === 'short' ? 'short' : 'long';
   field('stackPortfolioCap').value = typeof plan?.cap === 'string' ? plan.cap : '';
   rows.clear();
   accountList.replaceChildren();
-  const savedRows = Array.isArray(plan?.accounts) && plan.accounts.length ? plan.accounts : [{ values: { profile: activeProfile?.id } }];
+  const firstProfile = vestRoster.plans[profileId]?.inactive ? undefined : profileId;
+  const savedRows = Array.isArray(plan?.accounts) && plan.accounts.length ? plan.accounts : [{ values: { profile: firstProfile } }];
   for (const saved of savedRows) addAccount(saved);
   confirmed.checked = false;
   results.hidden = true;
 }
 
 if (['nq', 'es'].includes(draft.family)) family.value = draft.family;
-loadPlan();
+const linkedUrl = new URL(window.location.href);
+const linkedAccount = getProfile(linkedUrl.searchParams.get('account'));
+loadPlan(linkedAccount?.id ?? activeProfile?.id);
+if (linkedAccount && !vestRoster.plans[linkedAccount.id]?.inactive) {
+  const existing = [...rows.keys()].find(row => input(row, 'profile').value === linkedAccount.id);
+  const row = existing ?? addAccount({ values: { profile: linkedAccount.id } });
+  linkedUrl.searchParams.delete('account');
+  window.history.replaceState(null, '', linkedUrl);
+  remember();
+  input(row, 'profile').focus();
+}
 
 form.addEventListener('input', event => {
   const { target } = event;
@@ -338,7 +360,11 @@ accountList.addEventListener('click', event => {
 
 form.addEventListener('submit', event => {
   event.preventDefault();
-  if ([...rows.values()].some(state => !state.rules)) {
+  const currentRoster = readVestRoster();
+  if ([...rows.keys()].some(row => currentRoster.plans[input(row, 'profile').value]?.inactive === true)) {
+    results.hidden = true;
+    showStatus('Remove inactive rows or restore those profiles in Vest Accounts before sizing.', 'attention');
+  } else if ([...rows.values()].some(state => !state.rules)) {
     results.hidden = true;
     showStatus('Wait for each account’s order rules or retry market data before sizing.', 'attention');
   } else {
