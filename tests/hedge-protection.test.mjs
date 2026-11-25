@@ -70,6 +70,12 @@ test('flattening can leave negative headroom when closing costs exceed the room'
   assert.equal(result.modeledEquity, 936);
   assert.equal(result.remainingRoom, -14);
   assert.equal(result.unavoidableCost, 14);
+
+  const exactRoom = checkProtection({ ...account, equity: 100.3, peakEquity: 100.3, firmFloor: 90, reserve: 0, giveback: 0.3 });
+  const closeAll = sizeHedgeReduction({ ...leg, openContracts: 3, exitCostPerContract: 0.1, protection: exactRoom });
+  assert.equal(closeAll.keep, 0);
+  assert.equal(closeAll.remainingRoom, 0);
+  assert.equal(closeAll.unavoidableCost, 0);
 });
 
 test('existing giveback shortfall and a flat leg still report signed room', () => {

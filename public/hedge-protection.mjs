@@ -75,13 +75,14 @@ export function sizeHedgeReduction(input = {}) {
   const modeledEquity = equity - modeledLoss;
   const roomAfterMove = roomAfterCost - modeledKeepLoss;
   const remainingRoom = Math.abs(roomAfterMove) <= roomTolerance ? 0 : roomAfterMove;
+  const exitCostShortfall = totalExitCost - Math.max(0, rawRoom);
   if (![modeledLoss, modeledEquity, remainingRoom].every(Number.isFinite)) {
     return { errors: ['These hedge inputs are outside the supported calculation range.'] };
   }
 
   return {
     errors, keep, trim, riskPerContract, totalExitCost, modeledKeepLoss, modeledLoss, modeledEquity, remainingRoom,
-    unavoidableCost: Math.max(0, totalExitCost - Math.max(0, rawRoom)),
+    unavoidableCost: exitCostShortfall > roomTolerance ? exitCostShortfall : 0,
     firmThresholdReached: firmRoomAfterCost - modeledKeepLoss <= firmTolerance,
   };
 }
