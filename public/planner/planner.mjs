@@ -3,6 +3,7 @@ import { getRotation, getMarketRotation } from '../rotation.mjs';
 import { ASSET_WINDOWS, TIMING_EVENTS, TIMING_SOURCES } from './rotation-reference.mjs';
 import { getSessionPlays, PLAY_SOURCES } from './session-plays.mjs';
 import { MARKET_MEMORY_PLAYBOOKS } from './market-memory.mjs';
+import { PLAYBOOKS, getPlaybooksForWindow } from './playbooks.mjs';
 
 const clockZone = document.getElementById('planner-time-zone');
 const filterButtons = [...document.querySelectorAll('[data-asset]')];
@@ -34,6 +35,96 @@ function makeElement(tag, text, className) {
   if (text) element.textContent = text;
   if (className) element.className = className;
   return element;
+}
+
+const playbookAnchor = id => `playbook-${id}`;
+
+function playbookLink({ id, title }) {
+  const link = makeElement('a', title);
+  link.href = `#${playbookAnchor(id)}`;
+  return link;
+}
+
+function playbookChecklist(heading, entries, ordered = false) {
+  const section = makeElement('div');
+  const list = makeElement(ordered ? 'ol' : 'ul');
+  list.append(...entries.map(entry => makeElement('li', entry)));
+  section.append(makeElement('h4', heading), list);
+  return section;
+}
+
+function playbookArticle({ id, title, window, overview, assets, preparation, setups, skip, sources = [] }) {
+  const article = makeElement('article', '', 'playbook-article');
+  article.id = playbookAnchor(id);
+  article.tabIndex = -1;
+  const heading = makeElement('h3', title);
+  heading.id = `${article.id}-title`;
+  article.setAttribute('aria-labelledby', heading.id);
+  const headingRow = makeElement('div', '', 'playbook-heading');
+  const back = makeElement('a', 'All playbooks', 'playbook-back');
+  back.href = '#playbooks';
+  headingRow.append(heading, back);
+  const fields = makeElement('dl', '', 'playbook-markets');
+  const markets = makeElement('dd');
+  const marketList = makeElement('ul');
+  marketList.append(...assets.map(asset => makeElement('li', asset)));
+  markets.append(marketList);
+  fields.append(makeElement('dt', 'Markets'), markets);
+  const playList = makeElement('div', '', 'playbook-setups');
+  playList.append(makeElement('h4', 'Setups'));
+  for (const { name, trigger, invalidation, management } of setups) {
+    const card = makeElement('div', '', 'playbook-setup');
+    const rules = makeElement('dl');
+    for (const [label, text] of [['Confirmation', trigger], ['Invalidation', invalidation], ['Management', management]]) {
+      rules.append(makeElement('dt', label), makeElement('dd', text));
+    }
+    card.append(makeElement('h5', name), rules);
+    playList.append(card);
+  }
+  article.append(headingRow, makeElement('p', window, 'playbook-timing'), makeElement('p', overview), fields,
+    playbookChecklist('Preparation', preparation, true), playList, playbookChecklist('When to skip', skip));
+  for (const { label, url } of sources) {
+    const link = makeElement('a', label, 'playbook-source');
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    article.append(link);
+  }
+  return article;
+}
+
+const playbookLibrary = PLAYBOOKS.map(playbook => ({ link: playbookLink(playbook), article: playbookArticle(playbook) }));
+document.getElementById('playbook-index').append(...playbookLibrary.map(({ link }) => link));
+document.getElementById('playbook-reader').append(...playbookLibrary.map(({ article }) => article));
+
+function selectPlaybook(entry) {
+  for (const { link, article } of playbookLibrary) {
+    const selected = article === entry.article;
+    article.hidden = !selected;
+    if (selected) link.setAttribute('aria-current', 'location');
+    else link.removeAttribute('aria-current');
+  }
+}
+
+function openLinkedPlaybook() {
+  const entry = playbookLibrary.find(({ link }) => link.hash === window.location.hash);
+  if (!entry) return;
+  selectPlaybook(entry);
+  entry.article.focus({ preventScroll: true });
+  entry.article.scrollIntoView();
+}
+
+selectPlaybook(playbookLibrary[0]);
+window.addEventListener('hashchange', openLinkedPlaybook);
+
+function appendPlaybookLinks(card, windowId) {
+  const entries = getPlaybooksForWindow(windowId);
+  if (!entries.length) return;
+  const links = makeElement('div', '', 'session-guide-links');
+  links.setAttribute('role', 'group');
+  links.setAttribute('aria-label', 'Detailed playbooks');
+  links.append(makeElement('span', 'Playbooks'), ...entries.map(playbookLink));
+  card.append(links);
 }
 
 function displayZone() {
@@ -171,6 +262,7 @@ function sessionCard(session, upcoming) {
   if (upcoming && preparation[session.kind]) card.append(makeElement('p', preparation[session.kind]));
   appendSessionPlays(card, session.id, upcoming ? 'Plays to prepare' : 'Session setup examples');
   if (session.id === 'us-equities') card.append(memoryLink('Day Two · U.S. stock session playbook'));
+  appendPlaybookLinks(card, session.id);
   return card;
 }
 
@@ -221,6 +313,7 @@ function rotationCard(window, upcoming) {
   if (status === 'prepare' && (playKey === 'ny-equity-prep' || playKey === 'Prepare the equity open')) {
     card.append(memoryLink('Prepare prior-day levels with Market Memory'));
   }
+  if (status === 'prepare' || status === 'focus') appendPlaybookLinks(card, playKey);
   return card;
 }
 
@@ -362,4 +455,5 @@ for (const source of distinctSources.values()) {
 
 configureFormatters();
 update();
+if (window.location.hash) openLinkedPlaybook();
 window.setInterval(update, 1000);

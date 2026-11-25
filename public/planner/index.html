@@ -29,6 +29,7 @@
         <div>
           <h1 id="planner-title">Trade Planner</h1>
           <p>Follow your execution windows, check market hours, and prepare the next watchlist.</p>
+          <a class="planner-library-link" href="#playbooks">Browse playbooks ↓</a>
         </div>
         <div class="planner-clock">
           <time id="planner-date"></time>
@@ -106,6 +107,14 @@
       <section class="panel planner-agenda" id="opening-plan" aria-labelledby="opening-title" hidden>
         <div class="planner-section-heading"><h2 id="opening-title">New York opening sequence</h2></div>
         <div id="opening-steps" class="session-timeline"></div>
+      </section>
+
+      <section class="panel planner-library" id="playbooks" aria-labelledby="library-title">
+        <div class="planner-section-heading"><h2 id="library-title">Playbook Library</h2></div>
+        <div class="playbook-layout">
+          <nav aria-label="Session playbooks" class="playbook-index" id="playbook-index"></nav>
+          <div id="playbook-reader"></div>
+        </div>
       </section>
 
       <section id="rotation-references" class="planner-references" aria-label="Trading playbook reference">

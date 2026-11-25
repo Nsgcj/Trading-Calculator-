@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { getMarketRotation, getRotation } from '../public/rotation.mjs';
 import { getSessionPlays } from '../public/planner/session-plays.mjs';
+import { getPlaybooksForWindow } from '../public/planner/playbooks.mjs';
 
 const personal = time => getRotation(new Date(time));
 
@@ -47,6 +48,23 @@ test('Day Two plays match the New York entry phases and stay out of preparation 
     const { current } = personal(`2026-11-24T${time}:00Z`);
     const plays = getSessionPlays(current.phase?.name ?? current.id);
     assert.deepEqual(plays.filter(play => play.marketMemory).map(play => play.name), expected);
+  }
+});
+
+test('playbook links distinguish opening, continuation and no-entry windows', () => {
+  const cases = [
+    ['14:25', ['equities-open', 'equity-hedge']],
+    ['14:40', ['equities-open']],
+    ['14:45', ['equities-open', 'equity-hedge']],
+    ['15:30', ['morning-continuation']],
+    ['16:30', []],
+    ['18:30', ['afternoon-continuation']],
+    ['20:00', ['power-hour']],
+  ];
+  for (const [time, expected] of cases) {
+    const { current } = personal(`2026-11-24T${time}:00Z`);
+    const playbooks = getPlaybooksForWindow(current.phase?.name ?? current.id);
+    assert.deepEqual(playbooks.map(playbook => playbook.id), expected);
   }
 });
 
