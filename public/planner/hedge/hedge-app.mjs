@@ -1,14 +1,12 @@
 import { fmt } from '../../engine.mjs';
 import { sizeHedge, HEDGE_CONTRACTS } from '../../hedge.mjs';
 import { getHedgeHorizon } from '../../hedge-horizon.mjs';
-import { initVestHedge } from './vest-app.mjs';
 
 const field = id => document.getElementById(id);
 const form = field('hedgeForm');
 const results = field('hedgeResults');
 const status = field('hedgeStatus');
 const storageKey = 'chicken-man-hedge-v1';
-const platformKey = 'chicken-man-hedge-platform-v1';
 const numericFields = [
   'portfolioValue', 'beta', 'entryPrice', 'coveragePercent', 'downPercent', 'upPercent', 'riskLimit',
   'feePerContract', 'holdingCostPerContract', 'targetProtection', 'maxContracts', 'availableMargin', 'marginPerContract',
@@ -84,8 +82,8 @@ function renderResults(model, input, horizon, instrument) {
   const expiry = field('expiryDate').value;
   const checks = [];
   if (!horizon) checks.push('Choose a valid exit date to check the holding period.');
-  if (horizon?.calendarDays > 0 && !field('holdingAllowed').checked) {
-    checks.push('Confirm your account allows holding through the selected date, including any overnight or weekend sessions.');
+  if (!field('holdingAllowed').checked) {
+    checks.push('Confirm your account allows this hedge and holding it through the selected exit, including any applicable overnight or weekend sessions.');
   }
   if (horizon && (!expiry || horizon.exitDate >= expiry)) {
     checks.push(expiry
@@ -186,39 +184,6 @@ form.addEventListener('submit', event => {
 });
 update();
 
-function readLocal(key) {
-  try { return localStorage.getItem(key); } catch { return null; }
+if (new URLSearchParams(window.location.search).get('platform') === 'vest') {
+  field('legacyVestHedgeNotice').hidden = false;
 }
-
-function readRiskDesk() {
-  try { return JSON.parse(readLocal('chicken-man-riskdesk-v1')) ?? {}; } catch { return {}; }
-}
-
-const riskDesk = readRiskDesk();
-const lastAccount = Array.isArray(riskDesk.accounts) ? riskDesk.accounts.find(account => account?.id === riskDesk.accountId) : null;
-const platformPicker = field('hedgePlatform');
-let startedVest = false;
-const savedPlatform = readLocal(platformKey);
-const linkedPlatform = new URLSearchParams(window.location.search).get('platform');
-const validPlatform = platform => platform === 'cme' || platform === 'vest';
-platformPicker.value = validPlatform(linkedPlatform) ? linkedPlatform : validPlatform(savedPlatform) ? savedPlatform
-  : lastAccount && lastAccount.platform !== 'vest' ? 'cme' : 'vest';
-
-function showPlatform() {
-  const vest = platformPicker.value === 'vest';
-  field('cmeHedgeWorkspace').hidden = vest;
-  field('vestHedgeWorkspace').hidden = !vest;
-  field('hedgePageIntro').textContent = vest
-    ? 'Size a Vest perpetual hedge using native units, the current account floor, and a move in price points.'
-    : 'Size a futures hedge for a stock or ETF position. Compare modeled protection and hedge losses, then set a date to exit.';
-  if (vest && !startedVest) {
-    initVestHedge(riskDesk);
-    startedVest = true;
-  }
-}
-
-platformPicker.addEventListener('change', () => {
-  try { localStorage.setItem(platformKey, platformPicker.value); } catch {}
-  showPlatform();
-});
-showPlatform();

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0c1320">
-  <meta name="description" content="Size a Vest perpetual or CME futures hedge using modeled protection and account risk limits.">
+  <meta name="description" content="Size a CME equity index futures hedge for a stock or ETF position and compare protection, losses, and costs.">
   <title>CHICKEN MAN | Hedge Sizer</title>
   <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="../../styles.css">
@@ -28,20 +28,17 @@
     </header>
 
     <main class="hedge-page">
-      <div class="hedge-heading hedge-sizer-heading">
-        <div>
-          <h1>Hedge Sizer</h1>
-          <p id="hedgePageIntro">Size a futures hedge for a stock or ETF position. Compare modeled protection and hedge losses, then set a date to exit.</p>
+      <div class="hedge-heading">
+        <h1>Hedge Sizer</h1>
+        <p>Model a CME equity index futures hedge for a stock or ETF position. Use this planner with a futures account that permits hedging and holding through your planned exit.</p>
+        <div class="hedge-links">
           <a class="planner-library-link" href="./review/">Review an open CME hedge</a>
-        </div>
-        <div class="panel hedge-platform-picker">
-          <label for="hedgePlatform">Hedge platform</label>
-          <select id="hedgePlatform">
-            <option value="cme">CME Futures</option>
-            <option value="vest">Vest Perpetuals</option>
-          </select>
+          <a class="planner-library-link" href="../stack/">Stack Planner</a>
         </div>
       </div>
+      <p id="legacyVestHedgeNotice" class="hedge-account-notice" hidden>
+        The Vest workflow follows the same-direction rule for Instant Funded accounts. Use the <a href="../stack/">Stack Planner</a> to plan entries and adds.
+      </p>
 
       <div class="hedge-layout" id="cmeHedgeWorkspace">
         <form id="hedgeForm" class="panel hedge-form" aria-label="Hedge inputs">
@@ -128,7 +125,7 @@
             <p class="hedge-help" id="horizonSummary" aria-live="polite"></p>
             <div class="check-row hedge-hold">
               <input id="holdingAllowed" type="checkbox">
-              <label for="holdingAllowed">My account permits holding futures through the planned exit.</label>
+              <label for="holdingAllowed">My account permits this futures hedge and holding it through the planned exit.</label>
             </div>
           </fieldset>
 
@@ -170,140 +167,6 @@
         </section>
       </div>
 
-      <div class="hedge-layout" id="vestHedgeWorkspace" hidden>
-        <form id="vestHedgeForm" class="panel hedge-form" aria-label="Vest perpetual hedge inputs">
-          <fieldset>
-            <legend>Held position and Vest quote</legend>
-            <div class="hedge-fields">
-              <div class="field">
-                <label for="vestInstrument">Vest perpetual</label>
-                <select id="vestInstrument" aria-describedby="vestSpecStatus">
-                  <option value="vest-nq">NQ-PERP · Nasdaq-100</option>
-                  <option value="vest-es">ES-PERP · S&amp;P 500</option>
-                </select>
-              </div>
-              <div class="field">
-                <label for="vestHeldSide">Held position direction</label>
-                <select id="vestHeldSide">
-                  <option value="long">Long</option>
-                  <option value="short">Short</option>
-                </select>
-              </div>
-              <div class="field">
-                <label for="vestHeldQuantity">Held position size <span>native units</span></label>
-                <input id="vestHeldQuantity" type="number" min="0" step="any" inputmode="decimal" aria-describedby="vestExposureHelp" required>
-              </div>
-              <div class="field">
-                <label for="vestEntry">Vest entry or reference price <span>points</span></label>
-                <input id="vestEntry" type="number" min="0" step="any" inputmode="decimal" aria-describedby="vestQuoteStatus" required>
-              </div>
-            </div>
-            <div class="hedge-quote-controls">
-              <button id="vestRefreshQuote" type="button" class="link-button">Refresh Vest quote</button>
-              <p id="vestQuoteStatus" class="hedge-help" role="status"></p>
-            </div>
-            <p id="vestSpecStatus" class="hedge-help"></p>
-            <p id="vestExposureHelp" class="hedge-help">Enter the size of your existing position in this same Vest perpetual. Use the fractional quantity shown on Vest.</p>
-          </fieldset>
-
-          <fieldset>
-            <legend>Hedge account and risk budget</legend>
-            <div class="hedge-fields">
-              <div class="field">
-                <label for="vestHedgeAccount">Vest hedge account</label>
-                <select id="vestHedgeAccount" aria-describedby="vestAccountHelp"></select>
-              </div>
-              <div class="field">
-                <label for="vestRiskMode">Risk mode</label>
-                <select id="vestRiskMode"></select>
-              </div>
-              <div class="field">
-                <label for="vestEquity">Current equity <span>USD</span></label>
-                <input id="vestEquity" type="number" step="any" inputmode="decimal" aria-describedby="vestAccountHelp" required>
-              </div>
-              <div class="field">
-                <label for="vestFloor">Current failure floor <span>USD</span></label>
-                <input id="vestFloor" type="number" step="any" inputmode="decimal" aria-describedby="vestAccountHelp" required>
-              </div>
-              <div class="field">
-                <label for="vestReserve">Extra safety reserve <span>USD · optional</span></label>
-                <input id="vestReserve" type="number" min="0" step="any" placeholder="0" inputmode="decimal">
-              </div>
-              <div class="field">
-                <label for="vestRiskPercent">Risk fraction <span>% of usable room</span></label>
-                <input id="vestRiskPercent" type="number" min="0" max="100" step="any" value="15" inputmode="decimal" required>
-              </div>
-            </div>
-            <p id="vestAccountHelp" class="hedge-help">Available drawdown is calculated locally from the equity, floor, reserve, and any daily limit you enter. Update saved values from your current account snapshot.</p>
-            <p id="vestBudgetSummary" class="hedge-help vest-budget-summary" role="status"></p>
-            <p id="vestRulesNote" class="hedge-help vest-rules-note"></p>
-          </fieldset>
-
-          <fieldset>
-            <legend>Modeled market moves and protection</legend>
-            <div class="hedge-fields">
-              <div class="field">
-                <label for="vestDownPoints">Modeled market decline <span>points</span></label>
-                <input id="vestDownPoints" type="number" min="0" step="any" inputmode="decimal" aria-describedby="vestScenarioHelp" required>
-              </div>
-              <div class="field">
-                <label for="vestUpPoints">Modeled market advance <span>points</span></label>
-                <input id="vestUpPoints" type="number" min="0" step="any" inputmode="decimal" aria-describedby="vestScenarioHelp" required>
-              </div>
-              <div class="field">
-                <label for="vestCoveragePercent">Maximum exposure to hedge <span>%</span></label>
-                <input id="vestCoveragePercent" type="number" min="0" max="100" step="any" value="100" inputmode="decimal" aria-describedby="vestProtectionHelp" required>
-              </div>
-              <div class="field">
-                <label for="vestProtectionTarget">Minimum protection <span>USD · optional</span></label>
-                <input id="vestProtectionTarget" type="number" min="0" step="any" inputmode="decimal" aria-describedby="vestProtectionHelp">
-              </div>
-            </div>
-            <p id="vestScenarioHelp" class="hedge-help">Enter the size of each market move in points. Estimate moves over the period you expect to hold the hedge.</p>
-            <p id="vestProtectionHelp" class="hedge-help">Coverage caps the offset as a share of the held exposure. Minimum protection is the desired hedge gain after costs in the scenario where the held position loses value.</p>
-          </fieldset>
-
-          <details class="hedge-details">
-            <summary>Execution costs and account limits</summary>
-            <div class="hedge-fields">
-              <div class="field">
-                <label for="vestFeePercent">Estimated trading fee <span>% per fill</span></label>
-                <input id="vestFeePercent" type="number" min="0" step="any" inputmode="decimal" aria-describedby="vestFeeHelp">
-              </div>
-              <div class="field">
-                <label for="vestSlippageTicks">Estimated entry and exit slippage <span>ticks total</span></label>
-                <input id="vestSlippageTicks" type="number" min="0" step="any" value="2" inputmode="decimal" aria-describedby="vestFeeHelp">
-              </div>
-              <div class="field">
-                <label for="vestHoldingCost">Estimated total holding cost <span>USD per unit · optional</span></label>
-                <input id="vestHoldingCost" type="number" min="0" step="any" placeholder="0" inputmode="decimal" aria-describedby="vestHoldingHelp">
-              </div>
-              <div class="field">
-                <label for="vestConversion">USDC to USD rate <span>USD per USDC</span></label>
-                <input id="vestConversion" type="number" min="0" step="any" value="1" inputmode="decimal">
-              </div>
-              <div class="field">
-                <label for="vestDailyRemaining">Daily loss room remaining <span>USD · optional</span></label>
-                <input id="vestDailyRemaining" type="number" min="0" step="any" inputmode="decimal">
-              </div>
-              <div class="field">
-                <label for="vestMaxQuantity">Remaining order capacity <span>native units · optional</span></label>
-                <input id="vestMaxQuantity" type="number" min="0" step="any" inputmode="decimal">
-              </div>
-            </div>
-            <p id="vestFeeHelp" class="hedge-help">The starting estimate uses Vest Markets’ published taker rate per fill. Update it for your account and estimate total slippage for entry and exit.</p>
-            <p id="vestHoldingHelp" class="hedge-help">Include estimated funding paid per native unit through the planned exit. Vest settles funding hourly. <a href="https://docs.vestmarkets.com/trading/funding-mechanism" target="_blank" rel="noopener noreferrer">Vest funding rules</a></p>
-          </details>
-
-          <button type="submit" class="copy-button hedge-submit">Calculate Vest hedge</button>
-        </form>
-
-        <section class="panel hedge-output" aria-labelledby="vestHedgeResultsTitle">
-          <h2 id="vestHedgeResultsTitle" tabindex="-1">Vest hedge plan</h2>
-          <p id="vestHedgeStatus" class="status-message hedge-status" role="status">Enter your held quantity, Vest price, account snapshot, and modeled moves to calculate.</p>
-          <div id="vestHedgeResults" class="hedge-results" hidden></div>
-        </section>
-      </div>
     </main>
   </div>
 </body>

@@ -1,0 +1,150 @@
+.stack-guide {
+  margin-bottom: 16px;
+}
+
+.stack-guide h2 {
+  margin: 0 0 9px;
+  font-size: 17px;
+  letter-spacing: -.02em;
+}
+
+.stack-guide ol {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 25px;
+  margin: 0;
+  padding-inline-start: 20px;
+  color: var(--sub);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.stack-guide li::marker {
+  color: var(--teal);
+  font-weight: 700;
+}
+
+.stack-guide strong {
+  color: #e4eef4;
+}
+
+.stack-accounts {
+  display: grid;
+  gap: 13px;
+}
+
+.stack-account {
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid #304557;
+  border-radius: 8px;
+  background: #101c2a;
+}
+
+.stack-account-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.stack-account-heading h3 {
+  margin: 0;
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+
+.stack-remove {
+  flex: none;
+  color: #f2b5b4;
+  min-height: 32px;
+}
+
+.stack-account fieldset {
+  margin-bottom: 17px;
+}
+
+.stack-account legend {
+  margin-bottom: 8px;
+  color: #d2e1eb;
+  font-size: 13px;
+}
+
+.stack-account .stack-input {
+  margin: 0;
+  gap: 5px;
+}
+
+.stack-input .stack-input-caption {
+  color: inherit;
+  font: inherit;
+}
+
+.stack-spec-status a,
+.stack-quote-controls a {
+  color: var(--teal);
+}
+
+.stack-broker-inputs {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.stack-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.stack-add {
+  min-height: 44px;
+  padding: 10px 13px;
+  border: 1px solid #366358;
+  border-radius: 7px;
+  background: #142b2b;
+  color: var(--teal);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.stack-add:hover {
+  background: #1c3b37;
+}
+
+.stack-actions .hedge-submit {
+  flex: 1 0 140px;
+  width: auto;
+  margin: 0;
+}
+
+.stack-output h2 {
+  scroll-margin-block: 16px;
+}
+
+.stack-output h2:focus {
+  border-radius: 2px;
+  outline: 2px solid var(--teal);
+  outline-offset: 4px;
+}
+
+@media (min-width: 901px) {
+  .stack-layout {
+    grid-template-columns: minmax(0, 1.2fr) minmax(340px, .8fr);
+  }
+
+  .stack-output {
+    position: sticky;
+    top: 16px;
+    max-height: calc(100dvh - 32px);
+    overflow-y: auto;
+  }
+}
+
+@media (max-width: 680px) {
+  .stack-guide ol {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+}
