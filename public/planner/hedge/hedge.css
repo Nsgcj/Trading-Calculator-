@@ -22,41 +22,25 @@
   line-height: 1.6;
 }
 
-.hedge-sizer-heading {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(200px, 270px);
-  gap: 16px 24px;
-  align-items: center;
-}
-
-.hedge-platform-picker {
-  padding: 12px 14px;
-}
-
-.hedge-quote-controls {
+.hedge-links {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0 10px;
-  margin-top: 6px;
+  gap: 0 16px;
 }
 
-.hedge-quote-controls .hedge-help {
-  margin-top: 0;
+.hedge-account-notice {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border: 1px solid #645039;
+  border-radius: 6px;
+  color: #ead1ac;
+  background: #30271e;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
-.vest-rules-note a {
+.hedge-account-notice a {
   color: var(--teal);
-}
-
-.hedge-help.vest-budget-summary {
-  color: #c7e8df;
-  font-weight: 650;
-  font-variant-numeric: tabular-nums;
-}
-
-#vestHedgeResultsTitle {
-  scroll-margin-block: 16px;
 }
 
 .hedge-layout {
@@ -244,12 +228,6 @@
 
 @media (max-width: 900px) {
   .hedge-layout {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 640px) {
-  .hedge-sizer-heading {
     grid-template-columns: 1fr;
   }
 }

@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0c1320">
+  <meta name="description" content="Model same-direction position adds across Vest perpetual and CME futures accounts.">
+  <title>CHICKEN MAN | Stack Planner</title>
+  <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../styles.css">
+  <link rel="stylesheet" href="../planner.css">
+  <link rel="stylesheet" href="../hedge/hedge.css">
+  <link rel="stylesheet" href="./stack.css">
+  <script type="module" src="./stack-app.mjs"></script>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="../../" aria-label="Risk Desk home">
+        <span class="brand-icon">C<span class="corner">M</span></span>
+        <span><strong>CHICKEN MAN</strong><small>RISK DESK</small></span>
+      </a>
+      <nav class="desk-nav" aria-label="Main navigation">
+        <a href="../../">Risk Calculator</a>
+        <a href="../">Trade Planner</a>
+        <a href="../hedge/">Hedge Sizer</a>
+        <a href="./" aria-current="page">Stack Planner</a>
+      </nav>
+    </header>
+
+    <main class="hedge-page stack-page">
+      <div class="hedge-heading">
+        <h1>Stack Planner</h1>
+        <p>Model a same-direction position add across accounts. See how much size fits each account and how much total loss the plan would model.</p>
+      </div>
+
+      <section class="panel stack-guide" aria-labelledby="stackGuideTitle">
+        <h2 id="stackGuideTitle">Before adding size</h2>
+        <ol>
+          <li><strong>Confirm the setup.</strong> Pick one market direction and set a structural stop for each account’s contract. Keep your Vest positions and adds on the same side for this plan.</li>
+          <li><strong>Enter each account snapshot.</strong> Only closed equity funds growth. The current mark and marked equity constrain how much fits above the drawdown floor.</li>
+          <li><strong>Check combined risk.</strong> Open and proposed size share one stop per account. Review the total modeled loss before acting on the plan.</li>
+        </ol>
+      </section>
+
+      <div class="hedge-layout stack-layout">
+        <form id="stackForm" class="panel hedge-form" aria-label="Stack planning inputs">
+          <fieldset>
+            <legend>Trade plan</legend>
+            <div class="hedge-fields stack-global-fields">
+              <div class="field">
+                <label for="stackFamily">Market</label>
+                <select id="stackFamily">
+                  <option value="nq">Nasdaq-100</option>
+                  <option value="es">S&amp;P 500</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="stackSide">Direction</label>
+                <select id="stackSide">
+                  <option value="long">Long</option>
+                  <option value="short">Short</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="stackPortfolioCap">Combined loss cap <span>USD · optional</span></label>
+                <input id="stackPortfolioCap" type="number" min="0" step="any" inputmode="decimal" aria-describedby="stackPortfolioHelp">
+              </div>
+            </div>
+            <p class="hedge-help" id="stackPortfolioHelp">Existing stop risk uses this cap first. Available risk for adds goes to the accounts in the order shown.</p>
+            <div class="check-row hedge-hold">
+              <input id="stackConfirmed" type="checkbox">
+              <label for="stackConfirmed">I confirmed the chart setup, included every account with matching exposure, and checked that each account allows the direction and planned orders.</label>
+            </div>
+          </fieldset>
+
+          <div id="stackAccounts" class="stack-accounts"></div>
+
+          <div class="stack-actions">
+            <button id="stackAddAccount" type="button" class="stack-add">+ Add account</button>
+            <button type="submit" class="copy-button hedge-submit">Calculate stack</button>
+          </div>
+        </form>
+
+        <section class="panel hedge-output stack-output" aria-labelledby="stackResultsTitle">
+          <h2 id="stackResultsTitle" tabindex="-1">Stack plan</h2>
+          <p id="stackStatus" class="status-message hedge-status" role="status">Enter the account balances, position details, and price levels to model your adds.</p>
+          <div id="stackResults" class="hedge-results"></div>
+        </section>
+      </div>
+
+      <template id="stackAccountTemplate">
+        <section class="stack-account" data-stack-account>
+          <div class="stack-account-heading">
+            <h3 data-account-title>Account</h3>
+            <button type="button" class="link-button stack-remove" data-action="remove">Remove account</button>
+          </div>
+          <fieldset>
+            <legend>Account and contract</legend>
+            <div class="hedge-fields">
+              <label class="field stack-input">
+                <span class="stack-input-caption">Account profile</span>
+                <select data-field="profile"></select>
+              </label>
+              <label class="field stack-input">
+                <span class="stack-input-caption">Account name</span>
+                <input data-field="name" type="text" maxlength="70" placeholder="e.g. Vest 01" required>
+              </label>
+              <label class="field stack-input">
+                <span class="stack-input-caption">Contract</span>
+                <select data-field="contractId" required></select>
+              </label>
+              <label class="field stack-input">
+                <span class="stack-input-caption">Risk fraction <span>%</span></span>
+                <input data-field="riskPercent" type="number" min="0" max="100" step="any" value="5" inputmode="decimal" required>
+              </label>
+              <label class="field stack-input">
+                <span class="stack-input-caption">Current marked equity <span>USD</span></span>
+                <input data-field="equity" type="number" step="any" inputmode="decimal" required>
+              </label>
+              <label class="field stack-input">
+                <span class="stack-input-caption">Closed equity <span>USD · balance excluding open P&amp;L</span></span>
+                <input data-field="closedEquity" type="number" step="any" inputmode="decimal" required>
+              </label>
+              <label class="field stack-input">
+                <span class="stack-input-caption">Current failure floor <span>USD</span></span>
+                <input data-field="floor" type="number" step="any" inputmode="decimal" required>
+              </label>
+              <label class="field stack-input">
+                <span class="stack-input-caption">Safety reserve <span>USD · optional</span></span>
+                <input data-field="reserve" type="number" min="0" step="any" inputmode="decimal" placeholder="0">
+              </label>
+            </div>
+            <p class="hedge-help">Use marked equity and the current floor from your account snapshot. Use the balance excluding open P&amp;L for closed equity.</p>
+            <p class="hedge-help stack-spec-status" data-spec-status></p>
+          </fieldset>
+
+          <fieldset>
+            <legend>Open position</legend>
+            <div class="hedge-fields">
+              <label class="field stack-input">
+                <span class="stack-input-caption">Open position direction</span>
+                <select data-field="existingSide">
+                  <option value="none">None</option>
+                  <option value="long">Long</option>
+                  <option value="short">Short</option>
+                </select>
+              </label>
+              <label class="field stack-input">
+                <span class="stack-input-caption">Open quantity <span>native units</span></span>
+                <input data-field="existingQuantity" type="number" min="0" step="any" value="0" inputmode="decimal" required>
+              </label>
+              <label class="field stack-input">
+                <span class="stack-input-caption">Average open entry <span>points · if open</span></span>
+                <input data-field="averageEntry" type="number" min="0" step="any" inputmode="decimal">
+              </label>
+              <label class="field stack-input">
+                <span class="stack-input-caption">Current mark <span>points</span></span>
+                <input data-field="mark" type="number" min="0" step="any" inputmode="decimal" required>
+              </label>
+            </div>
+            <div class="hedge-quote-controls stack-quote-controls">
+              <button type="button" class="link-button" data-action="refresh-market" data-venue="vest">Refresh Vest quote and specs</button>
+              <p class="hedge-help" data-market-status role="status"></p>
+            </div>
+            <p class="hedge-help" data-venue="cme">For CME, use the same futures expiry when entering the mark and price levels.</p>
+          </fieldset>
+
+          <fieldset>
+            <legend>Proposed add</legend>
+            <div class="hedge-fields">
+              <label class="field stack-input">
+                <span class="stack-input-caption">Proposed add entry <span>points</span></span>
+                <input data-field="entry" type="number" min="0" step="any" inputmode="decimal" required>
+              </label>
+              <label class="field stack-input">
+                <span class="stack-input-caption">Shared stop <span>points · open size and add</span></span>
+                <input data-field="stop" type="number" min="0" step="any" inputmode="decimal" required>
+              </label>
+              <label class="field stack-input">
+                <span class="stack-input-caption">Target price <span>points · optional</span></span>
+                <input data-field="target" type="number" min="0" step="any" inputmode="decimal">
+              </label>
+            </div>
+          </fieldset>
+
+          <details class="hedge-details stack-broker-inputs">
+            <summary>Broker costs and position limits</summary>
+            <div class="hedge-fields">
+              <label class="field stack-input" data-venue="vest">
+                <span class="stack-input-caption">Vest trading fee <span>% per fill</span></span>
+                <input data-field="feePercent" type="number" min="0" step="any" inputmode="decimal">
+              </label>
+              <label class="field stack-input" data-venue="vest">
+                <span class="stack-input-caption">USDC to USD rate <span>USD per USDC</span></span>
+                <input data-field="conversion" type="number" min="0" step="any" value="1" inputmode="decimal">
+              </label>
+              <label class="field stack-input" data-venue="cme">
+                <span class="stack-input-caption">CME commission <span>USD per contract per side</span></span>
+                <input data-field="feePerUnit" type="number" min="0" step="any" inputmode="decimal" placeholder="0">
+              </label>
+              <label class="field stack-input">
+                <span class="stack-input-caption">Estimated slippage <span>ticks total</span></span>
+                <input data-field="slippageTicks" type="number" min="0" step="any" value="2" inputmode="decimal">
+              </label>
+              <label class="field stack-input">
+                <span class="stack-input-caption">Daily loss room remaining <span>USD · optional</span></span>
+                <input data-field="dailyRemaining" type="number" min="0" step="any" inputmode="decimal">
+              </label>
+              <label class="field stack-input">
+                <span class="stack-input-caption">Total position cap <span>native units · optional</span></span>
+                <input data-field="maxQuantity" type="number" min="0" step="any" inputmode="decimal">
+              </label>
+            </div>
+            <p class="hedge-help">Estimate total entry and exit slippage. The position cap applies to open and proposed size combined.</p>
+          </details>
+        </section>
+      </template>
+    </main>
+  </div>
+</body>
+</html>
