@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { getMarketRotation, getRotation } from '../public/rotation.mjs';
+import { getSessionPlays } from '../public/planner/session-plays.mjs';
 
 const personal = time => getRotation(new Date(time));
 
@@ -32,6 +33,21 @@ test('mandatory downtime has no new-entry watchlist', () => {
   assert.deepEqual(current.assets, []);
   assert.equal(next.id, 'afternoon-continuation');
   assert.equal(next.start.toISOString(), '2026-11-24T18:30:00.000Z');
+});
+
+test('Day Two plays match the New York entry phases and stay out of preparation and downtime', () => {
+  const cases = [
+    ['14:40', []],
+    ['14:45', ['Day Two · John Wick rejection']],
+    ['15:30', ['Day Two · Hold and retest (Hitchhiker)']],
+    ['16:30', []],
+    ['18:30', ['Day Two · Afternoon backside']],
+  ];
+  for (const [time, expected] of cases) {
+    const { current } = personal(`2026-11-24T${time}:00Z`);
+    const plays = getSessionPlays(current.phase?.name ?? current.id);
+    assert.deepEqual(plays.filter(play => play.marketMemory).map(play => play.name), expected);
+  }
 });
 
 test('the Asia strategy keeps its 8 p.m. Eastern start across daylight changes', () => {
