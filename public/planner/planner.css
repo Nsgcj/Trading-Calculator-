@@ -334,6 +334,11 @@
 .planner-library-link:hover {
   border-color: var(--teal);
 }
+.playbook-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 8px;
+}
 .session-guide-links {
   display: flex;
   flex-wrap: wrap;

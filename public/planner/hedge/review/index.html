@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0c1320">
+  <meta name="description" content="Review an open futures hedge using a chart invalidation level and account drawdown room.">
+  <title>CHICKEN MAN | Hedge Review</title>
+  <link rel="icon" href="../../../favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../styles.css">
+  <link rel="stylesheet" href="../../planner.css">
+  <link rel="stylesheet" href="../hedge.css">
+  <link rel="stylesheet" href="./review.css">
+  <script type="module" src="./review-app.mjs"></script>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="../../../" aria-label="Risk Desk home">
+        <span class="brand-icon">C<span class="corner">M</span></span>
+        <span><strong>CHICKEN MAN</strong><small>RISK DESK</small></span>
+      </a>
+      <nav class="desk-nav" aria-label="Main navigation">
+        <a href="../../../">Risk Calculator</a>
+        <a href="../../">Trade Planner</a>
+        <a href="../">Hedge Sizer</a>
+        <a href="./" aria-current="page">Hedge Review</a>
+      </nav>
+    </header>
+
+    <main class="hedge-page review-page">
+      <div class="hedge-heading">
+        <h1>Hedge Review</h1>
+        <p>Review an open futures hedge against your chart level and account limits. Check how much size still fits before deciding whether to hold, trim, or exit.</p>
+      </div>
+
+      <section class="panel review-protocol" aria-labelledby="reviewProtocolTitle">
+        <h2 id="reviewProtocolTitle">Hold, trim, or exit</h2>
+        <p>Before the cash open, mark the last session’s high and low and the swing that would invalidate the hedge. For a multi-day hold, keep the level tied to the original setup. Use one candle interval for your reviews.</p>
+        <dl>
+          <div><dt>Hold</dt><dd>The chart level still holds and the position fits the account’s modeled risk room.</dd></div>
+          <div><dt>Review or trim</dt><dd>Near the level, review the next completed candle. If the modeled move exceeds the account’s risk room, assess how much size to reduce.</dd></div>
+          <div><dt>Exit review</dt><dd>Look for a close through the level and follow-through. Account limits can require reducing or exiting sooner.</dd></div>
+        </dl>
+        <p>For the New York open, use 9:30–9:45 a.m. ET to observe price discovery. Recheck after your chosen candle closes and before a scheduled release or your account’s exit cutoff.</p>
+      </section>
+
+      <div class="hedge-layout review-layout">
+        <form id="reviewForm" class="panel hedge-form" aria-label="Hedge review inputs">
+          <fieldset>
+            <legend>Chart invalidation</legend>
+            <div class="hedge-fields">
+              <div class="field">
+                <label for="contractId">Futures contract</label>
+                <select id="contractId" required></select>
+              </div>
+              <div class="field">
+                <label for="hedgeSide">Open hedge side</label>
+                <select id="hedgeSide">
+                  <option value="short">Short</option>
+                  <option value="long">Long</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="lastClose">Latest completed candle close <span>points</span></label>
+                <input id="lastClose" type="number" min="0" step="any" inputmode="decimal" aria-describedby="reviewChartHelp" required>
+              </div>
+              <div class="field">
+                <label for="invalidationPrice">Pre-marked invalidation level <span>points</span></label>
+                <input id="invalidationPrice" type="number" min="0" step="any" inputmode="decimal" aria-describedby="reviewChartHelp" required>
+              </div>
+              <div class="field">
+                <label for="warningTicks">Early review distance <span>ticks · optional</span></label>
+                <input id="warningTicks" type="number" min="0" step="1" value="4" inputmode="numeric" aria-describedby="reviewWarningHelp">
+              </div>
+            </div>
+            <p class="hedge-help" id="reviewChartHelp">Use the same contract and chart timeframe for the level and the completed candle close. The review uses the chart observations you enter.</p>
+            <p class="hedge-help" id="reviewWarningHelp">This is the distance from the invalidation level that prompts an early review.</p>
+            <div class="check-row hedge-hold">
+              <input id="confirmedFollowThrough" type="checkbox">
+              <label for="confirmedFollowThrough">A retest held beyond the level or another completed candle closed beyond it.</label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Open position stress test</legend>
+            <div class="hedge-fields">
+              <div class="field">
+                <label for="openContracts">Open hedge size <span>contracts</span></label>
+                <input id="openContracts" type="number" min="0" step="1" inputmode="numeric" required>
+              </div>
+              <div class="field">
+                <label for="adverseTicks">Additional adverse move <span>ticks</span></label>
+                <input id="adverseTicks" type="number" min="1" step="1" inputmode="numeric" aria-describedby="reviewStressHelp" required>
+              </div>
+              <div class="field">
+                <label for="exitCostPerContract">Estimated close cost <span>USD per contract · optional</span></label>
+                <input id="exitCostPerContract" type="number" min="0" step="any" placeholder="0" inputmode="decimal" aria-describedby="reviewCloseCostHelp">
+              </div>
+            </div>
+            <p class="hedge-help" id="reviewStressHelp">Measure the next move against the hedge from the mark already included in current equity.</p>
+            <p class="hedge-help" id="reviewCloseCostHelp">Include expected closing fees and slippage beyond what is already reflected in equity.</p>
+          </fieldset>
+
+          <fieldset>
+            <legend>Hedge account</legend>
+            <div class="hedge-fields">
+              <div class="field">
+                <label for="hedgeEquity">Current equity <span>USD</span></label>
+                <input id="hedgeEquity" type="number" step="any" inputmode="decimal" aria-describedby="reviewEquityHelp" required>
+              </div>
+              <div class="field">
+                <label for="hedgePeakEquity">Peak equity to protect <span>USD</span></label>
+                <input id="hedgePeakEquity" type="number" step="any" inputmode="decimal" aria-describedby="reviewEquityHelp" required>
+              </div>
+              <div class="field">
+                <label for="hedgeFirmFloor">Current firm failure floor <span>USD</span></label>
+                <input id="hedgeFirmFloor" type="number" step="any" inputmode="decimal" required>
+              </div>
+              <div class="field">
+                <label for="hedgeReserve">Extra safety reserve <span>USD · optional</span></label>
+                <input id="hedgeReserve" type="number" min="0" step="any" placeholder="0" inputmode="decimal">
+              </div>
+              <div class="field">
+                <label for="hedgeGiveback">Maximum giveback from peak <span>USD</span></label>
+                <input id="hedgeGiveback" type="number" min="0" step="any" inputmode="decimal" aria-describedby="reviewGivebackHelp" required>
+              </div>
+            </div>
+            <p class="hedge-help" id="reviewEquityHelp">Take current equity and the current floor from the same broker snapshot. Measure peak equity on the same basis, including open P&amp;L consistently.</p>
+            <p class="hedge-help" id="reviewGivebackHelp">Peak equity minus maximum giveback sets the amount of equity you want to protect.</p>
+          </fieldset>
+
+          <div class="check-row hedge-hold review-account-toggle">
+            <input id="includeOther" type="checkbox" aria-controls="otherAccountFields">
+            <label for="includeOther">Review a separate account’s drawdown room</label>
+          </div>
+          <fieldset class="review-other" id="otherAccountFields" hidden>
+            <legend>Separate account</legend>
+            <div class="hedge-fields">
+              <div class="field">
+                <label for="otherEquity">Current equity <span>USD</span></label>
+                <input id="otherEquity" type="number" step="any" inputmode="decimal" aria-describedby="reviewEquityHelp" required>
+              </div>
+              <div class="field">
+                <label for="otherPeakEquity">Peak equity to protect <span>USD</span></label>
+                <input id="otherPeakEquity" type="number" step="any" inputmode="decimal" aria-describedby="reviewEquityHelp" required>
+              </div>
+              <div class="field">
+                <label for="otherFirmFloor">Current firm failure floor <span>USD</span></label>
+                <input id="otherFirmFloor" type="number" step="any" inputmode="decimal" required>
+              </div>
+              <div class="field">
+                <label for="otherReserve">Extra safety reserve <span>USD · optional</span></label>
+                <input id="otherReserve" type="number" min="0" step="any" placeholder="0" inputmode="decimal">
+              </div>
+              <div class="field">
+                <label for="otherGiveback">Maximum giveback from peak <span>USD</span></label>
+                <input id="otherGiveback" type="number" min="0" step="any" inputmode="decimal" aria-describedby="reviewGivebackHelp" required>
+              </div>
+            </div>
+            <p class="hedge-help">This snapshot shows its own equity room. The futures stress test applies to the hedge account.</p>
+          </fieldset>
+
+          <button type="submit" class="copy-button hedge-submit">Run review</button>
+        </form>
+
+        <section class="panel hedge-output review-output" aria-labelledby="reviewResultsTitle">
+          <h2 id="reviewResultsTitle" tabindex="-1">Review results</h2>
+          <p id="reviewStatus" class="status-message hedge-status" role="status">Enter your chart, open position, and hedge account snapshot.</p>
+          <div id="reviewResults" class="hedge-results" hidden></div>
+        </section>
+      </div>
+
+      <p class="review-source">If you are using the Phidias Advent Challenge, its published rules allow one active contest entry per participant. <a href="https://member.phidiaspropfirm.com/advent/rules?_lang=en" target="_blank" rel="noopener noreferrer">Official Phidias rules</a></p>
+    </main>
+  </div>
+</body>
+</html>

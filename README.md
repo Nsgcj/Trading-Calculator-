@@ -54,6 +54,8 @@ Select **Browse playbooks** for the detailed session guides, including preparati
 
 Use **Hedge Sizer** to model a partial offset for long or short equity exposure with ES, MES, NQ, or MNQ. It compares rising, flat, and falling benchmark scenarios after entered costs and can size toward an optional dollar protection target within the entered loss, position, margin, and coverage limits. Week-end and month-end dates use scheduled U.S. cash closes. Verify your futures contract’s last trading date, overnight permissions, and margin for the holding period.
 
+Use **Hedge Review** for an existing hedge. Enter your chart invalidation level and last completed close. Review alerts progress from proximity to a break and then confirmed follow-through. The risk check protects the higher of peak equity minus allowed giveback and the firm floor plus reserve. It models the smallest trim that fits the entered adverse move and exit costs. Each account keeps its own drawdown room. Review results use fresh manual inputs each time.
+
 ### Automatic entry and exit levels
 
 - Uncheck **Use manual stop-loss** or leave its input blank for an automatic stop. The default is a 1% adverse move from entry, adjusted to the instrument’s tick. Change the distance if you need a different scenario.
