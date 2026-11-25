@@ -74,7 +74,11 @@ function playbookArticle({ id, title, window, overview, assets, preparation, set
   if (id === 'equity-hedge') {
     const sizer = makeElement('a', 'Open Hedge Sizer', 'planner-library-link');
     sizer.href = './hedge/';
-    article.append(sizer);
+    const review = makeElement('a', 'Review an open hedge', 'planner-library-link');
+    review.href = './hedge/review/';
+    const links = makeElement('div', '', 'playbook-tools');
+    links.append(sizer, review);
+    article.append(links);
   }
   const playList = makeElement('div', '', 'playbook-setups');
   playList.append(makeElement('h4', 'Setups'));
