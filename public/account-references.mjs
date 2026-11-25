@@ -1,3 +1,5 @@
+import { PHIDIAS_ADVENT_2026 } from './contests.mjs';
+
 const topstepFees='https://help.topstep.com/en/articles/8284213-topstepx-commissions-and-fees';
 const mffFees='https://help.myfundedfutures.com/en/articles/9735811-futures-instrument-list';
 const tptFees='https://takeprofittraderhelp.zendesk.com/hc/en-us/articles/15172548967069-Commissions-on-Test-and-PRO-accounts';
@@ -13,6 +15,7 @@ const mffRoundTurns={
 };
 
 const feeReferences={
+  [PHIDIAS_ADVENT_2026.id]:['Phidias lists commissions by data feed and contract. Enter the round-trip cost for your Rithmic or dxFeed account.','https://phidiaspropfirm.com/rules'],
   topstep:['TopstepX publishes total USD round-turn costs by symbol across its account stages.',topstepFees],
   mff:['My Funded Futures publishes USD round-trip costs by contract. Check platform and live account differences.',mffFees],
   apex:['Commission schedules differ by platform. The linked Rithmic table lists evaluation and funded round-turn costs.','https://apextraderfunding.com/help-center/rithmic/rithmic-commissions-instruments/'],
@@ -39,6 +42,7 @@ const feeReferences={
   'my-funded-perps':['Published per-fill rates by asset class: 0.03% crypto, 0.0025% forex, 0.005% stocks, commodities and indices.','https://myfundedperpetuals.com/faq'],
 };
 const dailyReferences={
+  [PHIDIAS_ADVENT_2026.id]:['The Advent rules list a static $0 floor. Enter a separate daily allowance if it appears on your account.',PHIDIAS_ADVENT_2026.sourceUrl],
   vest:['Vest Instant lists max drawdown as its sole rule. Other programs can differ.','https://www.vestfunded.com/instant'],
   mff:['Rapid EOD with DLL publishes $500 for $25k and $1,000 for $50k in evaluation and sim. Standard Rapid EOD and redesigned Pro differ.','https://help.myfundedfutures.com/en/articles/18337038-rapid-eod-with-dll-a-detailed-look'],
   'mff-live':['Live daily loss rules depend on the funded plan and current account.','https://help.myfundedfutures.com/en/articles/12109396-comprehensive-faq-live-accounts-at-myfunded-futures'],

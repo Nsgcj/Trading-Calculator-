@@ -1,8 +1,12 @@
 /** Chicken Man Risk Desk - pure, deterministic sizing engine. No trading API or auto execution. */
+import { DEFAULT_CONTEST_ACCOUNT, PHIDIAS_ADVENT_2026, getContestInstrumentLimit, getContestStatus } from './contests.mjs';
+
 export const MODES = Object.freeze({
   safe: { label: 'Very Safe', fraction: 0.02, explanation: '2% of usable drawdown' },
   normal: { label: 'Normal', fraction: 0.05, explanation: '5% of usable drawdown' },
-  lottery: { label: 'Risk the Biscuit', fraction: 0.60, explanation: '60% of usable drawdown — account loss likely' },
+  lotteryLow: { label: 'Risk the Biscuit · Level 1', level: 1, fraction: 0.15, explanation: '15% of usable drawdown' },
+  lotteryMid: { label: 'Risk the Biscuit · Level 2', level: 2, fraction: 0.30, explanation: '30% of usable drawdown' },
+  lottery: { label: 'Risk the Biscuit · Level 3', level: 3, fraction: 0.60, explanation: '60% of usable drawdown' },
 });
 
 const PERPETUAL_VENUES = [
@@ -16,6 +20,7 @@ export const ACCOUNT_STAGES = Object.freeze({
   evaluation: 'Evaluation',
   'sim-funded': 'Simulated funded',
   'live-funded': 'Live funded',
+  contest: 'Contest',
 });
 
 const customPerpetual = { id: 'perp-custom', name: 'Custom perpetual', quote: 'quote currency', suffix: '' };
@@ -38,6 +43,7 @@ export const DEFAULT_ACCOUNTS = [
   { ...accountTemplate('vest', 'Vest Instant — example', 'vest', 'sim-funded', 'https://www.vestfunded.com/instant'), equity: 500, floor: 490 },
   { ...accountTemplate('mff', 'MFF Futures — example', 'futures', 'evaluation', mffStages), equity: 25000, floor: 24000 },
   { ...accountTemplate('custom', 'Personal account — example', 'custom', 'personal'), equity: 1000, floor: 900 },
+  DEFAULT_CONTEST_ACCOUNT,
   accountTemplate('mff-evaluation', 'My Funded Futures — Evaluation', 'futures', 'evaluation', mffStages),
   accountTemplate('mff-sim', 'My Funded Futures — Sim Funded', 'futures', 'sim-funded', mffStages),
   accountTemplate('mff-live', 'My Funded Futures — Live Funded', 'futures', 'live-funded', mffStages),
@@ -237,9 +243,19 @@ export function roundQuantityDown(value, step) {
   const units = Math.floor((value / step) + nearly);
   return Math.max(0, Number((units * step).toFixed(Math.min(100, precision))));
 }
+function isAdventContest(account) {
+  const id = PHIDIAS_ADVENT_2026.id;
+  return account.contestId === id || account.id === id;
+}
+
+export function getAccountFloor(account) {
+  return isAdventContest(account) ? PHIDIAS_ADVENT_2026.floor : account.floor;
+}
+
 export function getHeadroom(account) {
-  if ([account.equity,account.floor].some(value=>value==null || (typeof value==='string' && !value.trim()))) return null;
-  const equity = numeric(account.equity), floor = numeric(account.floor), reserve = numeric(account.reserve ?? 0);
+  const accountFloor = getAccountFloor(account);
+  if ([account.equity,accountFloor].some(value=>value==null || (typeof value==='string' && !value.trim()))) return null;
+  const equity = numeric(account.equity), floor = numeric(accountFloor), reserve = numeric(account.reserve ?? 0);
   if (!Number.isFinite(equity) || !Number.isFinite(floor) || !finiteNonnegative(reserve)) return null;
   const raw = equity - floor;
   if (!Number.isFinite(raw)) return null;
@@ -274,6 +290,12 @@ export function resolveExitInputs({useStop,useTarget,stopMode,stopInput,plannedQ
 export function sizePosition(p) {
   const warnings=[], errors=[];
   const a=p.account||{}, s=p.instrument||{};
+  const now=p.now===undefined?Date.now():new Date(p.now).getTime();
+  const contest=isAdventContest(a);
+  const contestId=PHIDIAS_ADVENT_2026.id;
+  const contestLimit=contest?getContestInstrumentLimit(contestId,s):null;
+  const contestStatus=contest?getContestStatus(contestId,now)?.status??'unknown':undefined;
+  const planOnly=contest && contestStatus!=='open';
   const h=getHeadroom(a), riskFraction=numeric(p.riskFraction), budget=getRiskBudget(a,riskFraction);
   const entry=numeric(p.entry), requested=numeric(p.stopInput), rr=numeric(p.rr);
   const budgetStop=p.stopMode==='budget', budgetTarget=p.targetMode==='budget';
@@ -284,6 +306,11 @@ export function sizePosition(p) {
   const tick=numeric(s.tickSize), pointQuote=numeric(s.pointValueQuote), fx=numeric(s.quoteToUSD), step=numeric(s.quantityStep), minQ=numeric(s.minQuantity);
   const slip=numeric(p.slippageTicks ?? 0), spread=numeric(p.spreadTicks ?? 0), fees=numeric(p.feePerUnit ?? 0), stressExtra=numeric(p.stressExtraTicks ?? 2);
   const differentPlatform=Boolean(a.platform && s.platform && a.platform!==s.platform);
+  if (contest && (a.platform!==DEFAULT_CONTEST_ACCOUNT.platform || !contestLimit)) {
+    errors.push('Select a supported CME, CBOT, NYMEX or COMEX futures contract for this contest.');
+  } else if (contest && (!Number.isInteger(step) || !Number.isInteger(minQ))) {
+    errors.push('Contest futures must use whole-contract sizes and increments.');
+  }
   if (!h) errors.push('Enter valid account equity, failure floor and safety reserve.');
   else if (h.raw <= 0) errors.push('Account equity is at/below the failure floor. No trade.');
   else if (h.usable <= 0) errors.push('No usable drawdown remains after the safety reserve.');
@@ -301,19 +328,35 @@ export function sizePosition(p) {
   if (!['price','points','ticks','pips','budget','none','auto'].includes(p.stopMode)) errors.push('Invalid stop unit.');
   if (p.targetMode!==undefined && !['stop','budget','none','auto'].includes(p.targetMode)) errors.push('Invalid take-profit method.');
   if (p.stopMode==='pips' && !finitePositive(numeric(s.pipSize))) errors.push('Pips require a verified pip size in the instrument settings.');
-  const maxQ=(a.maxQuantity===null||a.maxQuantity===''||a.maxQuantity===undefined)?null:numeric(a.maxQuantity);
-  if (maxQ!==null && !finiteNonnegative(maxQ)) errors.push('Max account quantity cannot be negative.');
-  if (errors.length) return {status:'BLOCKED',warnings,errors,headroom:h,budget};
+  const personalMaxQ=(a.maxQuantity===null||a.maxQuantity===''||a.maxQuantity===undefined)?null:numeric(a.maxQuantity);
+  if (personalMaxQ!==null && !finiteNonnegative(personalMaxQ)) errors.push('Max account quantity cannot be negative.');
+  const maxQ=contestLimit?Math.min(personalMaxQ??Infinity,contestLimit.maxQuantity):personalMaxQ;
+  const resultContext={
+    headroom:h,
+    budget,
+    ...(contest?{
+      planOnly, contestStatus,
+      contestQuantityLimit:contestLimit?.maxQuantity,
+      effectiveQuantityLimit:contestLimit && finiteNonnegative(maxQ) ? roundQuantityDown(maxQ,step) : undefined,
+    }:{}),
+  };
+  if (errors.length) return {status:'BLOCKED',warnings,errors,...resultContext};
   const pointUSD=pointQuote*fx;
   const costsPerUnit=(slip+spread)*tick*pointUSD+fees;
-  const blocked=message=>({status:'BLOCKED',warnings,errors:[message],headroom:h,budget});
+  const blocked=message=>({status:'BLOCKED',warnings,errors:[message],...resultContext});
   if (!finitePositive(pointUSD) || !finiteNonnegative(costsPerUnit)) return blocked('Instrument value or execution costs are outside the supported range.');
   const direction = p.side==='long' ? -1 : 1;
   let stopRaw, stop;
   if (budgetStop) {
+    if (contest && !Number.isSafeInteger(plannedQuantity)) {
+      return blocked('Enter a whole number of contracts for this contest.');
+    }
     const increments=plannedQuantity/step;
     if (!Number.isSafeInteger(Math.round(increments)) || Math.abs(increments-Math.round(increments))>nearly) {
       return blocked('Planned quantity must match the instrument quantity increment.');
+    }
+    if (contestLimit && plannedQuantity>contestLimit.maxQuantity) {
+      return blocked(`Planned quantity exceeds the contest cap of ${contestLimit.maxQuantity} contracts for this instrument.`);
     }
     if (plannedQuantity<minQ || (maxQ!==null && plannedQuantity>maxQ)) {
       return blocked('Planned quantity is outside the instrument minimum or account maximum.');
@@ -343,7 +386,7 @@ export function sizePosition(p) {
   if (stop <= 0) errors.push('Stop price must remain positive.');
   if (p.side==='long' && !(stop<entry) || p.side==='short' && !(stop>entry)) errors.push('Stop must be beyond entry in the loss direction.');
   if (!finitePositive(distance)) errors.push('Stop distance is zero.');
-  if (errors.length) return {status:'BLOCKED',warnings,errors,headroom:h,budget};
+  if (errors.length) return {status:'BLOCKED',warnings,errors,...resultContext};
   const targetDirection=budgetTarget?-direction:direction;
   const targetAt=distance=>tickRound(entry-direction*distance,tick,targetDirection>0?'up':'down');
   const validTarget=price=>finitePositive(price) && direction*(entry-price)>0;
@@ -355,14 +398,24 @@ export function sizePosition(p) {
   if (!finiteNonnegative(minNotional)) return blocked('Minimum order value must be nonnegative.');
   const lossPerUnit=distance*pointUSD+costsPerUnit;
   const qtyRisk=budgetStop?plannedQuantity:roundQuantityDown(budget/lossPerUnit,step);
-  const qty=budgetStop || maxQ===null?qtyRisk:Math.min(qtyRisk,roundQuantityDown(maxQ,step));
+  let qty=budgetStop || maxQ===null?qtyRisk:Math.min(qtyRisk,roundQuantityDown(maxQ,step));
+  const reachesFloor=contest && qty*lossPerUnit>=h.raw;
+  if (reachesFloor && budgetStop) {
+    return {...blocked('The modeled stop would reach the contest’s fixed $0 floor.'),...suggestedLevels};
+  }
+  if (reachesFloor) {
+    qty=roundQuantityDown(qty-step,step);
+    warnings.push('Position size was reduced to keep modeled equity above the contest floor.');
+  }
   if (qty+nearly<minQ) {
     const message = maxQ!==null && maxQ<minQ
       ? 'The account quantity cap is below the venue minimum.'
-      : 'The venue’s smallest order exceeds this risk budget at the selected stop.';
+      : reachesFloor
+        ? 'The venue’s smallest order would reach the contest’s fixed $0 floor.'
+        : 'The venue’s smallest order exceeds this risk budget at the selected stop.';
     errors.push(message);
   }
-  if (errors.length) return {status:'BLOCKED',warnings,errors,headroom:h,budget,...suggestedLevels,minimumUnitRisk:lossPerUnit*minQ};
+  if (errors.length) return {status:'BLOCKED',warnings,errors,...resultContext,...suggestedLevels,minimumUnitRisk:lossPerUnit*minQ};
   if (qty*entry*pointQuote<minNotional) return {...blocked('Order value at entry is below the entered venue minimum.'),...suggestedLevels};
   const risk=qty*lossPerUnit;
   if (!finitePositive(risk) || risk-budget>budget*1e-10) return blocked('Modeled loss exceeds the risk budget at this quantity.');
@@ -373,23 +426,26 @@ export function sizePosition(p) {
   const reward=noTarget?undefined:grossTarget-roundTripCosts;
   const stressRisk=risk+qty*stressExtra*tick*pointUSD;
   if (!a.verified) warnings.push('Account floor and drawdown rules are not confirmed. Enter the live broker floor before trading.');
-  const specCurrent=s.verified && (!s.lookupAt || Date.now()-s.lookupAt<86400000) && s.platform!=='hyperliquid';
+  const specCurrent=s.verified && (!s.lookupAt || now-s.lookupAt<86400000) && s.platform!=='hyperliquid';
   if (s.platform==='hyperliquid') warnings.push('Hyperliquid price precision changes with price and asset. The entered fixed tick is an estimate.');
   if (differentPlatform) warnings.push('Check that your account offers this instrument and uses the displayed contract units and position limits.');
   if (!specCurrent) warnings.push('Instrument unit/lot/contract specification NOT verified. Confirm the platform specification.');
   if (fees===0) warnings.push('Modeled commission is $0. Estimated costs can differ from actual execution.');
   if (stressRisk > h.usable + nearly) warnings.push('Stress slippage could penetrate the safety reserve / failure floor.');
   if (riskFraction>=0.25) warnings.push('High-risk mode: one adverse move could consume a large share of available drawdown.');
-  if (!a.noDailyLimit && a.stage!=='personal' && (a.dailyRemaining==null || a.dailyRemaining==='')) warnings.push('Sizing uses remaining drawdown. Enter any separate daily loss allowance from your plan.');
-  const verified=Boolean(a.verified && specCurrent && !differentPlatform);
+  if (!contest && !a.noDailyLimit && a.stage!=='personal' && (a.dailyRemaining==null || a.dailyRemaining==='')) warnings.push('Sizing uses remaining drawdown. Enter any separate daily loss allowance from your plan.');
+  if (contest) warnings.push('Contest sizing covers one order. Apply a tighter remaining position cap if you have open exposure.');
+  if (planOnly) warnings.push('Contest session is inactive. This simulation is for planning only.');
+  const verified=Boolean(a.verified && specCurrent && !differentPlatform && !planOnly);
   return {
-    status:verified?'CALCULATED':'VERIFY',warnings,errors,headroom:h,budget,
+    status:verified?'CALCULATED':'VERIFY',warnings,errors,...resultContext,
     quantity:qty,risk,expectedReward:reward,rrNet:noTarget?undefined:reward/risk,
     maxLossFraction: risk/h.raw, reservePostStop: h.raw-risk,
     postStopEquity: numeric(a.equity)-risk, postTargetEquity:noTarget?undefined:numeric(a.equity)+reward,
     stop:noStop?undefined:stop,target,scenarioPrice:noStop?stop:undefined,notionalUSD:entry*pointUSD*qty,stopDistance:distance,stopTicks:distance/tick,
     perUnitLoss:lossPerUnit,pointValueUSD:pointUSD,tickValueUSD:pointUSD*tick,
     grossTarget,roundTripCosts,stressRisk,stressPostEquity:numeric(a.equity)-stressRisk,
+    ...(contestLimit?{contestCapApplied:!budgetStop && qtyRisk>contestLimit.maxQuantity && maxQ===contestLimit.maxQuantity}:{}),
     riskFraction, originalStop:noStop?undefined:stopRaw,entry,stopMode:p.stopMode,targetMode:p.targetMode??'stop'
   };
 }
