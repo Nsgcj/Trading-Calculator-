@@ -1,0 +1,99 @@
+.compound-mode-field {
+  margin-bottom: 14px;
+}
+
+.compound-example-fields,
+.compound-profile-list {
+  margin-top: 12px;
+}
+
+.compound-profile-list {
+  display: grid;
+  gap: 12px;
+}
+
+.compound-profile-list:empty {
+  margin-top: 0;
+}
+
+.compound-account {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #304557;
+  border-radius: 8px;
+  background: #101c2a;
+}
+
+.compound-account-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 9px;
+}
+
+.compound-account-heading h3 {
+  margin: 0;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.compound-remove {
+  flex: none;
+  min-height: 32px;
+  color: #f2b5b4;
+}
+
+.compound-add {
+  min-height: 40px;
+  margin-top: 4px;
+}
+
+.compound-account .compound-field {
+  gap: 5px;
+  margin: 0;
+}
+
+.compound-field .compound-field-caption {
+  color: inherit;
+  font: inherit;
+}
+
+.compound-saved-profile > .check-row {
+  margin: 0 0 9px;
+}
+
+.compound-risk-details {
+  margin-top: 12px;
+}
+
+.compound-risk-details summary {
+  cursor: pointer;
+}
+
+.compound-assumptions-note {
+  margin: 0 0 12px;
+}
+
+.compound-output h2 {
+  scroll-margin-block: 16px;
+}
+
+.compound-output h2:focus {
+  border-radius: 2px;
+  outline: 2px solid var(--teal);
+  outline-offset: 4px;
+}
+
+@media (min-width: 901px) {
+  .compound-layout {
+    grid-template-columns: minmax(0, .88fr) minmax(390px, 1.12fr);
+  }
+
+  .compound-output {
+    position: sticky;
+    top: 16px;
+    max-height: calc(100dvh - 32px);
+    overflow-y: auto;
+  }
+}

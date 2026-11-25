@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0c1320">
+  <meta name="description" content="Model trading growth milestones from usable drawdown and your own closed trade history.">
+  <title>CHICKEN MAN | Compound Calculator</title>
+  <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../styles.css">
+  <link rel="stylesheet" href="../planner.css">
+  <link rel="stylesheet" href="../hedge/hedge.css">
+  <link rel="stylesheet" href="./compound.css">
+  <script type="module" src="./compound-app.mjs"></script>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="../../" aria-label="Risk Desk home">
+        <span class="brand-icon">C<span class="corner">M</span></span>
+        <span><strong>CHICKEN MAN</strong><small>RISK DESK</small></span>
+      </a>
+      <nav class="desk-nav" aria-label="Main navigation">
+        <a href="../../">Risk Calculator</a>
+        <a href="../">Trade Planner</a>
+        <a href="../vest/">Vest Accounts</a>
+        <a href="./" aria-current="page">Compound Calculator</a>
+      </nav>
+    </header>
+
+    <main class="hedge-page compound-page">
+      <div class="hedge-heading">
+        <h1>Compound Calculator</h1>
+        <p>Plan closed-profit milestones from the loss room you have today. Compare a shared Vest goal or track individual account goals using one strategy’s assumptions.</p>
+      </div>
+
+      <div class="hedge-layout compound-layout">
+        <form id="compoundForm" class="panel hedge-form" aria-label="Compounding plan inputs" novalidate>
+          <fieldset>
+            <legend>Accounts and goals</legend>
+            <div class="field compound-mode-field">
+              <label for="compoundMode">Plan type</label>
+              <select id="compoundMode">
+                <option value="vest">Combined Vest goal</option>
+                <option value="individual">Individual account goals</option>
+              </select>
+            </div>
+
+            <div id="compoundVestFields">
+              <div class="hedge-fields">
+                <div class="field">
+                  <label for="vestGoal">Combined closed-profit goal <span>USD</span></label>
+                  <input id="vestGoal" type="number" min="0" step="any" value="100" inputmode="decimal" required>
+                </div>
+                <div class="field">
+                  <label for="vestEarned">Closed P&amp;L toward goal <span>USD</span></label>
+                  <input id="vestEarned" type="number" step="any" value="0" inputmode="decimal" aria-describedby="compoundEarnedHelp">
+                </div>
+                <div class="field">
+                  <label for="vestSource">Starting loss room</label>
+                  <select id="vestSource">
+                    <option value="example">Example inputs</option>
+                    <option value="saved">Saved Vest profiles</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="vestMinimum">Smallest modeled loss per account <span>USD · optional</span></label>
+                  <input id="vestMinimum" type="number" min="0" step="any" inputmode="decimal" aria-describedby="compoundMinimumHelp">
+                </div>
+              </div>
+              <div id="vestExampleFields" class="hedge-fields compound-example-fields">
+                <div class="field">
+                  <label for="vestCount">Number of example accounts</label>
+                  <input id="vestCount" type="number" min="1" max="10" step="1" value="3" inputmode="numeric" required>
+                </div>
+                <div class="field">
+                  <label for="vestRoom">Usable drawdown per account <span>USD</span></label>
+                  <input id="vestRoom" type="number" min="0" step="any" value="10" inputmode="decimal" aria-describedby="compoundRoomHelp" required>
+                </div>
+              </div>
+              <div id="vestProfiles" class="compound-profile-list" hidden></div>
+              <p class="hedge-help">Same-direction Vest accounts can win or lose together on one idea. Each account still has its own loss room.</p>
+            </div>
+
+            <div id="compoundIndividualFields" hidden>
+              <div id="compoundIndividualRows" class="compound-profile-list"></div>
+              <button id="compoundAddIndividual" type="button" class="link-button compound-add">+ Add individual plan</button>
+            </div>
+
+            <p class="hedge-help" id="compoundRoomHelp">Use closed equity minus the current failure floor and reserve. Apply the day’s loss limit separately when sizing a trade.</p>
+            <p class="hedge-help" id="compoundEarnedHelp">Booked gains reduce the remaining profit goal and booked losses raise it. Today’s loss room already reflects any retained gains.</p>
+            <p class="hedge-help" id="compoundMinimumHelp">Use the modeled loss at the stop for the smallest order you can place, including execution costs.</p>
+          </fieldset>
+
+          <fieldset>
+            <legend>Shared strategy assumptions</legend>
+            <p class="hedge-help compound-assumptions-note">Use one strategy’s results to compare separate plans. Count a trade idea repeated across accounts once in the sample.</p>
+            <div class="hedge-fields">
+              <div class="field">
+                <label for="compoundRisk">Risk fraction <span>% of usable room</span></label>
+                <input id="compoundRisk" type="number" min="0" max="100" step="any" value="5" inputmode="decimal" aria-describedby="compoundGuardHelp" required>
+              </div>
+              <div class="field">
+                <label for="compoundStreak">Consecutive losses to plan for</label>
+                <input id="compoundStreak" type="number" min="1" step="1" value="5" inputmode="numeric" aria-describedby="compoundGuardHelp" required>
+              </div>
+              <div class="field">
+                <label for="compoundKeep">Usable drawdown to keep after the streak <span>%</span></label>
+                <input id="compoundKeep" type="number" min="0" max="100" step="any" value="50" inputmode="decimal" aria-describedby="compoundKeepHelp" required>
+              </div>
+              <div class="field">
+                <label for="compoundWinR">Average net winner <span>R · from history</span></label>
+                <input id="compoundWinR" type="number" min="0" step="any" inputmode="decimal" aria-describedby="compoundRHelp">
+              </div>
+              <div class="field">
+                <label for="compoundWins">Closed winners in sample</label>
+                <input id="compoundWins" type="number" min="0" step="1" inputmode="numeric" aria-describedby="compoundHistoryHelp">
+              </div>
+              <div class="field">
+                <label for="compoundLosses">Closed losers in sample</label>
+                <input id="compoundLosses" type="number" min="0" step="1" inputmode="numeric" aria-describedby="compoundHistoryHelp">
+              </div>
+              <div class="field">
+                <label for="compoundPace">Qualifying completed trades per week</label>
+                <input id="compoundPace" type="number" min="0" step="any" inputmode="decimal" aria-describedby="compoundHistoryHelp">
+              </div>
+            </div>
+            <p class="hedge-help" id="compoundGuardHelp">The loss-streak guard caps risk for one idea. Include the combined loss at the stop for any entries stacked on that idea.</p>
+            <p class="hedge-help" id="compoundKeepHelp">The guard keeps at least this share of starting drawdown room after the modeled loss streak.</p>
+            <p class="hedge-help" id="compoundRHelp">One R is your average closed loss. Enter the average net winning trade as a multiple of that loss after costs.</p>
+            <p class="hedge-help" id="compoundHistoryHelp">Estimate pace from qualifying trades you actually complete. The cautious scenario uses a lower estimate of your win rate from the sample.</p>
+            <p class="hedge-help">The model holds the floor and reserve fixed and compounds gains kept in the account. Recalculate if the floor moves or you take a payout.</p>
+          </fieldset>
+
+          <button type="submit" class="copy-button hedge-submit">Calculate milestones</button>
+        </form>
+
+        <section class="panel hedge-output compound-output" aria-labelledby="compoundResultsTitle">
+          <h2 id="compoundResultsTitle" tabindex="-1">Compounding milestones</h2>
+          <p id="compoundStatus" class="status-message hedge-status" role="status">Choose your accounts and goal to start the plan.</p>
+          <div id="compoundResults" class="hedge-results" hidden></div>
+        </section>
+      </div>
+
+      <template id="compoundIndividualTemplate">
+        <section class="compound-account" data-compound-account>
+          <div class="compound-account-heading">
+            <h3 data-compound-title>Account plan</h3>
+            <button type="button" class="link-button compound-remove" data-action="remove">Remove plan</button>
+          </div>
+          <div class="hedge-fields">
+            <label class="field compound-field">
+              <span class="compound-field-caption">Account profile</span>
+              <select data-field="profile"></select>
+            </label>
+            <label class="field compound-field">
+              <span class="compound-field-caption">Account nickname</span>
+              <input data-field="name" type="text" maxlength="70" placeholder="e.g. Personal account" required>
+            </label>
+            <label class="field compound-field">
+              <span class="compound-field-caption">Current usable drawdown <span>USD</span></span>
+              <input data-field="room" type="number" min="0" step="any" inputmode="decimal" aria-describedby="compoundRoomHelp" required>
+            </label>
+            <label class="field compound-field">
+              <span class="compound-field-caption">Closed-profit goal <span>USD</span></span>
+              <input data-field="target" type="number" min="0" step="any" value="1000" inputmode="decimal" required>
+            </label>
+            <label class="field compound-field">
+              <span class="compound-field-caption">Closed P&amp;L toward goal <span>USD</span></span>
+              <input data-field="earned" type="number" step="any" value="0" inputmode="decimal" aria-describedby="compoundEarnedHelp">
+            </label>
+            <label class="field compound-field">
+              <span class="compound-field-caption">Smallest modeled loss <span>USD · optional</span></span>
+              <input data-field="minimum" type="number" min="0" step="any" inputmode="decimal" aria-describedby="compoundMinimumHelp">
+            </label>
+          </div>
+        </section>
+      </template>
+    </main>
+  </div>
+</body>
+</html>
