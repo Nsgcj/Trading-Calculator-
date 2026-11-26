@@ -53,13 +53,13 @@ test('Day Two plays match the New York entry phases and stay out of preparation 
 
 test('playbook links distinguish opening, continuation and no-entry windows', () => {
   const cases = [
-    ['14:25', ['equities-open', 'equity-hedge']],
+    ['14:25', ['equities-open', 'equity-hedge', 'stock-in-play']],
     ['14:40', ['equities-open']],
-    ['14:45', ['equities-open', 'equity-hedge']],
-    ['15:30', ['morning-continuation']],
+    ['14:45', ['equities-open', 'equity-hedge', 'structural-momentum', 'order-flow-momentum']],
+    ['15:30', ['morning-continuation', 'structural-momentum', 'order-flow-momentum']],
     ['16:30', []],
-    ['18:30', ['afternoon-continuation']],
-    ['20:00', ['power-hour']],
+    ['18:30', ['afternoon-continuation', 'structural-momentum', 'order-flow-momentum']],
+    ['20:00', ['power-hour', 'structural-momentum']],
   ];
   for (const [time, expected] of cases) {
     const { current } = personal(`2026-11-24T${time}:00Z`);

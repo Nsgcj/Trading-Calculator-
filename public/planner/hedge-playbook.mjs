@@ -1,6 +1,10 @@
 export const EQUITY_HEDGE_PLAYBOOK = {
   id: 'equity-hedge',
   title: 'Equity Open Hedge',
+  tools: [
+    { href: './hedge/', label: 'Open Hedge Sizer' },
+    { href: './hedge/review/', label: 'Review an open hedge' },
+  ],
   window: 'Prepare from 9:15 a.m. ET. The cash market opens at 9:30 a.m. ET. Under the Chicken Man plan, consider a new hedge from 9:45 to 11:30 a.m. ET only when the active window and account rules permit it.',
   overview: 'A partial hedge offsets some of an existing position’s market exposure for a defined period. For a long equity book, that can mean shorting a closely matched index future. A futures short without corresponding equity exposure adds directional risk. A hedge offsets some of the upside as well as the downside.',
   assets: [
