@@ -50,7 +50,7 @@ Conservative slippage stress is shown separately. Models may miss gaps, stop rej
 
 Open **Trade Planner** for the Chicken Man execution windows, the broader 24-hour asset rotation, and exchange market hours. Each view shows the last completed session, the current window and what to prepare for next. Common setups include what to watch for and when to skip a play. The execution view follows the New York opening steps and midday pause on new entries. Times default to Eastern Time. Select a linked asset to open it in the Risk Calculator with the current sizing account.
 
-Select **Browse playbooks** for the detailed session guides, including preparation, entry confirmation, invalidation, and trade management. Relevant session cards link directly to the guides.
+Select **Browse playbooks** for the session guides, 12 momentum trades, desk procedures, swing trades, and scalps. The guides cover preparation, confirmation, invalidation, and management. Relevant session cards link to their guides. The Opening Drive describes what to observe at the U.S. cash open. The execution plan reviews new cash-open entries from 9:45 a.m. ET.
 
 Use **Hedge Sizer** to model a partial offset for long or short equity exposure with ES, MES, NQ, or MNQ. It compares rising, flat, and falling benchmark scenarios after entered costs and can size toward an optional dollar protection target within the entered loss, position, margin, and coverage limits. Week-end and month-end dates use scheduled U.S. cash closes. Verify your futures contract’s last trading date, overnight permissions, and margin for the holding period.
 

@@ -3,7 +3,7 @@ import { getRotation, getMarketRotation } from '../rotation.mjs';
 import { ASSET_WINDOWS, TIMING_EVENTS, TIMING_SOURCES } from './rotation-reference.mjs';
 import { getSessionPlays, PLAY_SOURCES } from './session-plays.mjs';
 import { MARKET_MEMORY_PLAYBOOKS } from './market-memory.mjs';
-import { PLAYBOOKS, getPlaybooksForWindow } from './playbooks.mjs';
+import { PLAYBOOK_GROUPS, getPlaybooksForWindow } from './playbooks.mjs';
 
 const clockZone = document.getElementById('planner-time-zone');
 const filterButtons = [...document.querySelectorAll('[data-asset]')];
@@ -53,7 +53,7 @@ function playbookChecklist(heading, entries, ordered = false) {
   return section;
 }
 
-function playbookArticle({ id, title, window, overview, assets, preparation, setups, skip, sources = [] }) {
+function playbookArticle({ id, title, window, overview, assets, preparation, setups, skip, sources = [], sourceNote, setupsLabel = 'Setups', tools = [] }) {
   const article = makeElement('article', '', 'playbook-article');
   article.id = playbookAnchor(id);
   article.tabIndex = -1;
@@ -71,27 +71,32 @@ function playbookArticle({ id, title, window, overview, assets, preparation, set
   markets.append(marketList);
   fields.append(makeElement('dt', 'Markets'), markets);
   article.append(headingRow, makeElement('p', window, 'playbook-timing'), makeElement('p', overview));
-  if (id === 'equity-hedge') {
-    const sizer = makeElement('a', 'Open Hedge Sizer', 'planner-library-link');
-    sizer.href = './hedge/';
-    const review = makeElement('a', 'Review an open hedge', 'planner-library-link');
-    review.href = './hedge/review/';
+  if (tools.length) {
     const links = makeElement('div', '', 'playbook-tools');
-    links.append(sizer, review);
+    for (const { href, label } of tools) {
+      const link = makeElement('a', label, 'planner-library-link');
+      link.href = href;
+      links.append(link);
+    }
     article.append(links);
   }
   const playList = makeElement('div', '', 'playbook-setups');
-  playList.append(makeElement('h4', 'Setups'));
-  for (const { name, trigger, invalidation, management } of setups) {
+  playList.append(makeElement('h4', setupsLabel));
+  for (const { name, context, trigger, entry, invalidation, management, skip } of setups) {
     const card = makeElement('div', '', 'playbook-setup');
     const rules = makeElement('dl');
-    for (const [label, text] of [['Confirmation', trigger], ['Invalidation', invalidation], ['Management', management]]) {
+    for (const [label, text] of [
+      ['Context', context], ['Confirmation', trigger], ['Entry', entry], ['Invalidation', invalidation],
+      ['Management', management], ['Skip if', skip],
+    ]) {
+      if (!text) continue;
       rules.append(makeElement('dt', label), makeElement('dd', text));
     }
     card.append(makeElement('h5', name), rules);
     playList.append(card);
   }
   article.append(fields, playbookChecklist('Preparation', preparation, true), playList, playbookChecklist('When to skip', skip));
+  if (sourceNote) article.append(makeElement('p', sourceNote, 'playbook-provenance'));
   for (const { label, url } of sources) {
     const link = makeElement('a', label, 'playbook-source');
     link.href = url;
@@ -102,17 +107,34 @@ function playbookArticle({ id, title, window, overview, assets, preparation, set
   return article;
 }
 
-const playbookLibrary = PLAYBOOKS.map(playbook => ({ link: playbookLink(playbook), article: playbookArticle(playbook) }));
-document.getElementById('playbook-index').append(...playbookLibrary.map(({ link }) => link));
+const playbookIndex = document.getElementById('playbook-index');
+const playbookCategories = PLAYBOOK_GROUPS.map(group => {
+  const button = makeElement('button', group.label);
+  button.type = 'button';
+  button.setAttribute('aria-controls', 'playbook-index playbook-reader');
+  const entries = group.playbooks.map(playbook => ({ groupId: group.id, link: playbookLink(playbook), article: playbookArticle(playbook) }));
+  button.addEventListener('click', () => {
+    if (button.getAttribute('aria-pressed') === 'true') return;
+    const entry = entries[0];
+    selectPlaybook(entry);
+    history.replaceState(history.state, '', entry.link.hash);
+  });
+  return { id: group.id, button, entries };
+});
+const playbookLibrary = playbookCategories.flatMap(({ entries }) => entries);
+document.getElementById('playbook-categories').append(...playbookCategories.map(({ button }) => button));
 document.getElementById('playbook-reader').append(...playbookLibrary.map(({ article }) => article));
 
 function selectPlaybook(entry) {
+  const category = playbookCategories.find(({ id }) => id === entry.groupId);
+  for (const { id, button } of playbookCategories) button.setAttribute('aria-pressed', String(id === entry.groupId));
   for (const { link, article } of playbookLibrary) {
     const selected = article === entry.article;
     article.hidden = !selected;
     if (selected) link.setAttribute('aria-current', 'location');
     else link.removeAttribute('aria-current');
   }
+  playbookIndex.replaceChildren(...category.entries.map(({ link }) => link));
 }
 
 function openLinkedPlaybook() {
